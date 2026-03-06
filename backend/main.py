@@ -74,8 +74,9 @@ async def health():
     tools_status = {}
     for tool in ["ffmpeg", "ffprobe", "yt-dlp"]:
         try:
+            version_flag = "--version" if tool == "yt-dlp" else "-version"
             proc = await asyncio.create_subprocess_exec(
-                tool, "--version",
+                tool, version_flag,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -727,8 +728,9 @@ async def startup():
     print(f"📁 Clips-Verzeichnis: {CLIPS_DIR}")
     for tool in ["ffmpeg", "ffprobe", "yt-dlp"]:
         try:
+            version_flag = "--version" if tool == "yt-dlp" else "-version"
             proc = await asyncio.create_subprocess_exec(
-                tool, "--version",
+                tool, version_flag,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

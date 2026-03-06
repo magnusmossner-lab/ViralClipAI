@@ -9,7 +9,7 @@ class ClipRepository {
     suspend fun checkServer(): Boolean {
         return try {
             val response = api.healthCheck()
-            response.status == "ok"
+            response.status == "ok" || response.status == "degraded"
         } catch (e: Exception) {
             false
         }
