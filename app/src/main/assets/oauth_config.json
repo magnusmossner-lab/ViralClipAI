@@ -1,0 +1,10 @@
+{
+  "youtube": {
+    "client_id": "DEINE_YOUTUBE_CLIENT_ID.apps.googleusercontent.com",
+    "client_secret": "DEIN_YOUTUBE_CLIENT_SECRET"
+  },
+  "tiktok": {
+    "client_id": "DEINE_TIKTOK_CLIENT_KEY",
+    "client_secret": "DEIN_TIKTOK_CLIENT_SECRET"
+  }
+}
