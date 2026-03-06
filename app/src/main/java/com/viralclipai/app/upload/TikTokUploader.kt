@@ -72,7 +72,7 @@ class TikTokUploader {
                     "bytes $uploaded-${uploaded + bytesRead - 1}/$fileSize"
                 )
                 chunkConn.doOutput = true
-                chunkConn.fixedLengthStreamingMode = bytesRead
+                chunkConn.setFixedLengthStreamingMode(bytesRead)
                 chunkConn.outputStream.write(buffer, 0, bytesRead)
 
                 val code = chunkConn.responseCode
