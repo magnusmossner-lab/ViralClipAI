@@ -166,12 +166,11 @@ class AnalyticsClient(private val context: Context) {
     private suspend fun sendToBackend(stats: List<JSONObject>) =
         withContext(Dispatchers.IO) {
             try {
-                val service = ApiClient.getService()
-                // Send via direct HTTP to analytics endpoint
                 val body = JSONObject().apply {
                     put("stats", JSONArray(stats.map { it }))
                 }
-                val url = URL("${getBaseUrl()}api/v1/analytics/sync")
+                val baseUrl = ApiClient.getBaseUrl()
+                val url = URL("${baseUrl}api/v1/analytics/sync")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
                 conn.setRequestProperty("Content-Type", "application/json")
@@ -185,9 +184,4 @@ class AnalyticsClient(private val context: Context) {
                 Log.e(TAG, "Backend sync failed: ${e.message}")
             }
         }
-
-    private fun getBaseUrl(): String {
-        // Read from ApiClient - fallback to default
-        return "http://10.0.2.2:8000/"
-    }
 }

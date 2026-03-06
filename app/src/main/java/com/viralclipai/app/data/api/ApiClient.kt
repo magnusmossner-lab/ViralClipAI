@@ -37,6 +37,8 @@ object ApiClient {
         }
     }
 
+    fun getBaseUrl(): String = baseUrl
+
     fun getService(): ViralClipApiService {
         return apiService ?: synchronized(this) {
             apiService ?: buildService().also { apiService = it }

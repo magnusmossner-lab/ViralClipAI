@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.viralclipai.app.auth.OAuthManager
 import com.viralclipai.app.auth.Platform
+import com.viralclipai.app.data.api.ApiClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -125,7 +126,8 @@ class UploadViewModel : ViewModel() {
                 put("title", title)
                 put("tags", org.json.JSONArray(tags))
             }
-            val url = java.net.URL("http://10.0.2.2:8000/api/v1/analytics/track-upload")
+            val baseUrl = ApiClient.getBaseUrl()
+            val url = java.net.URL("${baseUrl}api/v1/analytics/track-upload")
             val conn = url.openConnection() as java.net.HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")

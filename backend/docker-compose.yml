@@ -1,10 +1,19 @@
-version: "3.8"
+version: '3.8'
 services:
-  viralclip-server:
+  backend:
     build: .
-    ports: ["8000:8000"]
-    volumes: [clips:/tmp/viralclip_clips]
+    ports:
+      - "8000:8000"
+    volumes:
+      - clip_data:/tmp/viralclip_clips
+    environment:
+      - CLIPS_DIR=/tmp/viralclip_clips
     restart: unless-stopped
-    environment: [PYTHONUNBUFFERED=1]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
-  clips:
+  clip_data:
