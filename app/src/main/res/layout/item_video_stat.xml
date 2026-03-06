@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="horizontal" android:background="@drawable/rounded_card"
+    android:padding="12dp" android:layout_marginBottom="6dp" android:gravity="center_vertical">
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+        android:orientation="vertical">
+        <TextView android:id="@+id/tv_video_id" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:textColor="@color/white"
+            android:textSize="13sp" android:textStyle="bold" />
+        <TextView android:id="@+id/tv_platform" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:textColor="@color/text_secondary" android:textSize="11sp" />
+    </LinearLayout>
+    <TextView android:id="@+id/tv_views" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="12sp"
+        android:layout_marginEnd="12dp" />
+    <TextView android:id="@+id/tv_likes" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="12sp"
+        android:layout_marginEnd="12dp" />
+    <TextView android:id="@+id/tv_engagement" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:textColor="@color/accent" android:textSize="12sp"
+        android:textStyle="bold" />
+</LinearLayout>
