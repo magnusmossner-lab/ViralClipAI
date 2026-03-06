@@ -147,7 +147,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(Modifier.padding(16.dp)) {
-                Text("ViralClip AI v2.0", fontWeight = FontWeight.Bold)
+                Text("ViralClip AI v2.2", fontWeight = FontWeight.Bold)
                 Text("Self-Healing Engine \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("ML Feedback Loop \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("YouTube + TikTok Upload \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

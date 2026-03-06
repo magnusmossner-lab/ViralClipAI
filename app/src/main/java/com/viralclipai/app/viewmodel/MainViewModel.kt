@@ -2,6 +2,7 @@ package com.viralclipai.app.viewmodel
 
 import android.app.Application
 import android.content.ContentValues
+import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -90,6 +91,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(error = "Bitte eine URL eingeben")
             return
         }
+
         if (!url.isYouTubeUrl()) {
             _uiState.value = _uiState.value.copy(error = "Keine gueltige YouTube-URL")
             return
@@ -108,10 +110,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     autoCaptions = s.autoCaptions,
                     autoSubtitles = s.autoSubtitles
                 )
+
                 val jobId = response.jobId
                 _uiState.value = _uiState.value.copy(currentJobId = jobId, statusText = "Job gestartet...")
 
-                // Poll for status
                 var consecutiveErrors = 0
                 while (true) {
                     delay(1500)
@@ -121,7 +123,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             progress = status.progress,
                             statusText = translateStatus(status.status)
                         )
-                        consecutiveErrors = 0 // Reset on success
+                        consecutiveErrors = 0
 
                         when (status.status) {
                             "done" -> {
@@ -166,9 +168,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun downloadClip(clipId: String) {
         viewModelScope.launch {
             try {
-                _uiState.value = _uiState.value.copy(downloadingClipId = clipId, downloadSuccess = null, error = null)
-                val bytes = repo.downloadClip(clipId)
+                _uiState.value = _uiState.value.copy(
+                    downloadingClipId = clipId,
+                    downloadSuccess = null,
+                    error = null
+                )
 
+                val bytes = repo.downloadClip(clipId)
                 if (bytes.isEmpty()) {
                     _uiState.value = _uiState.value.copy(
                         downloadingClipId = null,
@@ -177,29 +183,66 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                val filename = "ViralClip_${clipId}.mp4"
+                val filename = "ViralClip_${clipId}_${System.currentTimeMillis()}.mp4"
+                val app = getApplication<Application>()
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val resolver = getApplication<Application>().contentResolver
+                    // Android 10+ (API 29+): Use MediaStore with IS_PENDING
+                    val resolver = app.contentResolver
                     val values = ContentValues().apply {
                         put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
                         put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
                         put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/ViralClipAI")
+                        put(MediaStore.MediaColumns.IS_PENDING, 1)
+                        put(MediaStore.MediaColumns.DATE_ADDED, System.currentTimeMillis() / 1000)
+                        put(MediaStore.MediaColumns.DATE_MODIFIED, System.currentTimeMillis() / 1000)
                     }
+
                     val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-                    uri?.let {
-                        resolver.openOutputStream(it)?.use { out -> out.write(bytes) }
+                    if (uri != null) {
+                        resolver.openOutputStream(uri)?.use { out ->
+                            out.write(bytes)
+                            out.flush()
+                        }
+
+                        // Clear IS_PENDING flag to make visible in gallery
+                        val updateValues = ContentValues().apply {
+                            put(MediaStore.MediaColumns.IS_PENDING, 0)
+                        }
+                        resolver.update(uri, updateValues, null, null)
+
+                        Log.i(TAG, "Video saved via MediaStore: $uri")
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            downloadingClipId = null,
+                            error = "Konnte Video nicht in Galerie speichern"
+                        )
+                        return@launch
                     }
                 } else {
+                    // Android 9 and below: Direct file access
                     @Suppress("DEPRECATION")
-                    val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "ViralClipAI")
+                    val dir = File(
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                        "ViralClipAI"
+                    )
                     dir.mkdirs()
-                    File(dir, filename).writeBytes(bytes)
+                    val file = File(dir, filename)
+                    file.writeBytes(bytes)
+
+                    // Notify media scanner so video shows in gallery
+                    MediaScannerConnection.scanFile(
+                        app,
+                        arrayOf(file.absolutePath),
+                        arrayOf("video/mp4")
+                    ) { path, scannedUri ->
+                        Log.i(TAG, "MediaScanner indexed: $path -> $scannedUri")
+                    }
                 }
 
                 _uiState.value = _uiState.value.copy(
                     downloadingClipId = null,
-                    downloadSuccess = "\u2705 $filename gespeichert!"
+                    downloadSuccess = "\u2705 Video in Galerie gespeichert!\nOrdner: Filme/ViralClipAI"
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Download error", e)

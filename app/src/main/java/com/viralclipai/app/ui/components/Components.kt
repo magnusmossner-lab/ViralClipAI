@@ -3,18 +3,27 @@ package com.viralclipai.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import com.viralclipai.app.data.api.ApiClient
 import com.viralclipai.app.data.models.ClipData
 
 @Composable
@@ -36,6 +45,102 @@ fun ViralityBadge(score: Float) {
     }
 }
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+fun VideoPreviewPlayer(
+    clip: ClipData,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var isPlaying by remember { mutableStateOf(false) }
+
+    val videoUrl = remember(clip) {
+        val base = ApiClient.getBaseUrl()
+        when {
+            clip.previewUrl.startsWith("http") -> clip.previewUrl
+            clip.previewUrl.isNotBlank() -> base + clip.previewUrl.removePrefix("/")
+            clip.downloadUrl.startsWith("http") -> clip.downloadUrl
+            clip.downloadUrl.isNotBlank() -> base + clip.downloadUrl.removePrefix("/")
+            else -> base + "api/clip/${clip.id}/download"
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+    ) {
+        if (isPlaying) {
+            val exoPlayer = remember(videoUrl) {
+                ExoPlayer.Builder(context).build().apply {
+                    setMediaItem(MediaItem.fromUri(videoUrl))
+                    prepare()
+                    playWhenReady = true
+                    repeatMode = Player.REPEAT_MODE_ONE
+                }
+            }
+
+            DisposableEffect(Unit) {
+                onDispose { exoPlayer.release() }
+            }
+
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = true
+                        setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(9f / 16f)
+            )
+        } else {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clickable { isPlaying = true },
+                color = Color(0xFF1A1A2E),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(
+                            modifier = Modifier.size(64.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = "Vorschau abspielen",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "\u25B6 Clip-Vorschau",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "\u23F1 ${clip.duration.toInt()}s \u2022 9:16 Format",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun ClipCard(
     clip: ClipData,
@@ -50,7 +155,6 @@ fun ClipCard(
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Title + Virality Badge
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -68,8 +172,11 @@ fun ClipCard(
                 ViralityBadge(clip.viralityScore)
             }
 
-            // Caption
-            Spacer(Modifier.height(8.dp))
+            // VIDEO PREVIEW
+            Spacer(Modifier.height(12.dp))
+            VideoPreviewPlayer(clip = clip)
+
+            Spacer(Modifier.height(12.dp))
             Text(
                 "\uD83D\uDCDD \"${clip.caption}\"",
                 style = MaterialTheme.typography.bodyMedium,
@@ -77,14 +184,12 @@ fun ClipCard(
                 maxLines = 2
             )
 
-            // Duration + Expiry
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("\u23F1 ${clip.duration.toInt()}s", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("\u23F0 1h verfuegbar", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
-            // Tags
             if (clip.tags.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -103,7 +208,6 @@ fun ClipCard(
                 }
             }
 
-            // Star Rating Row (FIX: onRate was unused before)
             Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth(),
@@ -123,23 +227,24 @@ fun ClipCard(
                 }
             }
 
-            // Download Button
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
             Button(
                 onClick = onDownload,
                 enabled = !isDownloading,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 if (isDownloading) {
                     CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text("Laden...")
+                    Text("Wird in Galerie gespeichert...")
                 } else {
-                    Icon(Icons.Default.Download, null, Modifier.size(18.dp))
+                    Icon(Icons.Default.Download, null, Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Clip herunterladen", fontWeight = FontWeight.Bold)
+                    Text("\uD83D\uDCF1 In Galerie speichern", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
             }
         }
