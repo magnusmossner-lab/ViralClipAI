@@ -1,0 +1,10 @@
+version: "3.8"
+services:
+  viralclip-server:
+    build: .
+    ports: ["8000:8000"]
+    volumes: [clips:/tmp/viralclip_clips]
+    restart: unless-stopped
+    environment: [PYTHONUNBUFFERED=1]
+volumes:
+  clips:
