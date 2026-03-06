@@ -1,0 +1,29 @@
+# Android
+*.iml
+.gradle/
+build/
+local.properties
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# APK
+*.apk
+*.aab
+
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+
+# Secrets
+*.keystore
+*.jks
+oauth_config.json
