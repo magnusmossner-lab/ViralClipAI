@@ -1,6 +1,4 @@
-name: "🔥 Build ViralClip AI APK"
-
-on:
+  on:
   push:
     branches: [main, master]
   pull_request:
