@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.viralclipai.app.data.api.ApiClient
 import com.viralclipai.app.upload.UploadActivity
 import com.viralclipai.app.analytics.AnalyticsDashboardActivity
 import com.viralclipai.app.viewmodel.MainViewModel
@@ -24,7 +25,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val connected by viewModel.serverConnected.collectAsState()
     val context = LocalContext.current
-    var serverUrl by remember { mutableStateOf("http://192.168.1.100:8000") }
+    var serverUrl by remember { mutableStateOf(ApiClient.getBaseUrl()) }
     val scrollState = rememberScrollState()
 
     Column(
@@ -105,8 +106,6 @@ fun SettingsScreen(viewModel: MainViewModel) {
             Column(Modifier.padding(16.dp)) {
                 Text("Clip-Einstellungen", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Spacer(Modifier.height(12.dp))
-
-                // Duration
                 Text("Min. Dauer: ${uiState.minDuration}s", fontSize = 14.sp)
                 Slider(
                     value = uiState.minDuration.toFloat(),
@@ -122,8 +121,6 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     steps = 26
                 )
                 Spacer(Modifier.height(8.dp))
-
-                // Toggles
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("B-Roll Effekte", fontSize = 14.sp)
                     Switch(checked = uiState.brollEnabled, onCheckedChange = { viewModel.updateSettings(broll = it) })
@@ -140,16 +137,16 @@ fun SettingsScreen(viewModel: MainViewModel) {
         }
         Spacer(Modifier.height(16.dp))
 
-        // App Info
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(Modifier.padding(16.dp)) {
-                Text("ViralClip AI v2.2", fontWeight = FontWeight.Bold)
-                Text("Self-Healing Engine \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("ML Feedback Loop \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("ViralClip AI v3.0", fontWeight = FontWeight.Bold)
+                Text("Robuste Video-Verarbeitung \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Video-Vorschau mit ExoPlayer \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Galerie-Download mit Validierung \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("YouTube + TikTok Upload \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

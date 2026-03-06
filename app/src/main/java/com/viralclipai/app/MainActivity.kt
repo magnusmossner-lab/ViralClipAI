@@ -52,27 +52,23 @@ class MainActivity : ComponentActivity() {
         val permissionsToRequest = mutableListOf<String>()
 
         if (Build.VERSION.SDK_INT >= 33) {
-            // Android 13+ needs READ_MEDIA_VIDEO
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO)
                 != PackageManager.PERMISSION_GRANTED
             ) {
                 permissionsToRequest.add(Manifest.permission.READ_MEDIA_VIDEO)
             }
-            // Notification permission for download progress
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
             ) {
                 permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
             }
         } else if (Build.VERSION.SDK_INT <= 28) {
-            // Android 9 and below needs WRITE_EXTERNAL_STORAGE
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED
             ) {
                 permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             }
         }
-        // Android 10-12: scoped storage via MediaStore, no extra permissions needed for writing
 
         if (permissionsToRequest.isNotEmpty()) {
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
@@ -84,7 +80,17 @@ class MainActivity : ComponentActivity() {
 fun MainApp() {
     val vm: MainViewModel = viewModel()
     val connected by vm.serverConnected.collectAsState()
+    val clips by vm.clips.collectAsState()
     var tab by remember { mutableIntStateOf(0) }
+
+    // Auto-switch to Clips tab when clips are ready
+    val previousClipCount = remember { mutableIntStateOf(0) }
+    LaunchedEffect(clips.size) {
+        if (clips.isNotEmpty() && previousClipCount.intValue == 0 && tab == 0) {
+            tab = 1  // Switch to Clips tab
+        }
+        previousClipCount.intValue = clips.size
+    }
 
     Scaffold(
         topBar = {
@@ -99,7 +105,17 @@ fun MainApp() {
                     onClick = { tab = 0 }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.VideoLibrary, "Clips") },
+                    icon = {
+                        BadgedBox(
+                            badge = {
+                                if (clips.isNotEmpty()) {
+                                    Badge { Text("${clips.size}") }
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.VideoLibrary, "Clips")
+                        }
+                    },
                     label = { Text("Clips") },
                     selected = tab == 1,
                     onClick = { tab = 1 }

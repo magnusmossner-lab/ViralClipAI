@@ -32,6 +32,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val TAG = "MainViewModel"
         private const val MAX_RETRIES = 3
         private const val RETRY_DELAY_MS = 2000L
+        private const val MIN_VIDEO_SIZE = 50_000  // 50KB minimum for valid video
     }
 
     data class UiState(
@@ -60,7 +61,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _serverConnected.value = connected
             _uiState.value = _uiState.value.copy(
                 statusText = if (connected) "Server verbunden" else "Server nicht erreichbar",
-                error = if (!connected) "Server nicht erreichbar. Bitte Backend starten." else null
+                error = if (!connected) "Server nicht erreichbar. Pruefe deine Internetverbindung." else null
             )
         }
     }
@@ -116,7 +117,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 var consecutiveErrors = 0
                 while (true) {
-                    delay(1500)
+                    delay(2000)
                     try {
                         val status = repo.getJobStatus(jobId)
                         _uiState.value = _uiState.value.copy(
@@ -127,11 +128,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                         when (status.status) {
                             "done" -> {
-                                _clips.value = status.clips
-                                _uiState.value = _uiState.value.copy(
-                                    isProcessing = false, progress = 100,
-                                    statusText = "${status.clips.size} Clips erstellt!"
-                                )
+                                if (status.clips.isEmpty()) {
+                                    _uiState.value = _uiState.value.copy(
+                                        isProcessing = false,
+                                        error = "Keine Clips erstellt. Versuche ein anderes Video."
+                                    )
+                                } else {
+                                    _clips.value = status.clips
+                                    _uiState.value = _uiState.value.copy(
+                                        isProcessing = false, progress = 100,
+                                        statusText = "${status.clips.size} Clips erstellt! Wechsle zum Clips-Tab."
+                                    )
+                                }
                                 break
                             }
                             "error" -> {
@@ -174,20 +182,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     error = null
                 )
 
+                Log.i(TAG, "Starting download for clip: $clipId")
                 val bytes = repo.downloadClip(clipId)
-                if (bytes.isEmpty()) {
+
+                // Validate: real video must be > 50KB
+                if (bytes.size < MIN_VIDEO_SIZE) {
+                    Log.e(TAG, "Download too small: ${bytes.size} bytes (expected > $MIN_VIDEO_SIZE)")
                     _uiState.value = _uiState.value.copy(
                         downloadingClipId = null,
-                        error = "Download fehlgeschlagen: Leere Datei"
+                        error = "Download fehlgeschlagen: Datei zu klein (${bytes.size} Bytes). Der Clip ist moeglicherweise abgelaufen."
                     )
                     return@launch
                 }
+
+                // Validate: check MP4 magic bytes
+                if (bytes.size >= 8) {
+                    val header = String(bytes.sliceArray(4..7), Charsets.US_ASCII)
+                    if (header != "ftyp") {
+                        Log.e(TAG, "Not a valid MP4: header=$header")
+                        _uiState.value = _uiState.value.copy(
+                            downloadingClipId = null,
+                            error = "Download fehlgeschlagen: Keine gueltige Videodatei erhalten."
+                        )
+                        return@launch
+                    }
+                }
+
+                Log.i(TAG, "Download OK: ${bytes.size} bytes, saving to gallery...")
 
                 val filename = "ViralClip_${clipId}_${System.currentTimeMillis()}.mp4"
                 val app = getApplication<Application>()
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    // Android 10+ (API 29+): Use MediaStore with IS_PENDING
                     val resolver = app.contentResolver
                     val values = ContentValues().apply {
                         put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
@@ -205,13 +231,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             out.flush()
                         }
 
-                        // Clear IS_PENDING flag to make visible in gallery
                         val updateValues = ContentValues().apply {
                             put(MediaStore.MediaColumns.IS_PENDING, 0)
                         }
                         resolver.update(uri, updateValues, null, null)
 
-                        Log.i(TAG, "Video saved via MediaStore: $uri")
+                        Log.i(TAG, "Video saved via MediaStore: $uri (${bytes.size} bytes)")
                     } else {
                         _uiState.value = _uiState.value.copy(
                             downloadingClipId = null,
@@ -220,7 +245,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         return@launch
                     }
                 } else {
-                    // Android 9 and below: Direct file access
                     @Suppress("DEPRECATION")
                     val dir = File(
                         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
@@ -230,7 +254,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val file = File(dir, filename)
                     file.writeBytes(bytes)
 
-                    // Notify media scanner so video shows in gallery
                     MediaScannerConnection.scanFile(
                         app,
                         arrayOf(file.absolutePath),
@@ -242,7 +265,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 _uiState.value = _uiState.value.copy(
                     downloadingClipId = null,
-                    downloadSuccess = "\u2705 Video in Galerie gespeichert!\nOrdner: Filme/ViralClipAI"
+                    downloadSuccess = "\u2705 Video in Galerie gespeichert!\nOrdner: Filme/ViralClipAI\nGroesse: ${bytes.size / 1024}KB"
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Download error", e)
