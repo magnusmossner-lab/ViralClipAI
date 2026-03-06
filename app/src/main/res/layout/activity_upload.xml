@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_dark"
+    android:padding="16dp">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="🚀 Clip Hochladen" android:textSize="24sp" android:textColor="@color/white"
+            android:textStyle="bold" android:layout_marginBottom="16dp" />
+        <TextView android:id="@+id/tv_file_path" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="Keine Datei"
+            android:textColor="@color/text_secondary" android:textSize="12sp"
+            android:background="@drawable/rounded_card" android:padding="12dp"
+            android:layout_marginBottom="16dp" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Plattformen" android:textColor="@color/accent" android:textSize="16sp"
+            android:textStyle="bold" android:layout_marginBottom="8dp" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="8dp">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:text="📺 YouTube" android:textColor="@color/white" android:textSize="16sp" />
+            <TextView android:id="@+id/tv_youtube_status" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:textColor="@color/text_secondary"
+                android:textSize="12sp" android:layout_marginEnd="8dp" />
+            <Button android:id="@+id/btn_connect_youtube" android:layout_width="wrap_content"
+                android:layout_height="36dp" android:text="Verbinden" android:textSize="12sp"
+                android:backgroundTint="#FF0000" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="16dp">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:text="🎵 TikTok" android:textColor="@color/white" android:textSize="16sp" />
+            <TextView android:id="@+id/tv_tiktok_status" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:textColor="@color/text_secondary"
+                android:textSize="12sp" android:layout_marginEnd="8dp" />
+            <Button android:id="@+id/btn_connect_tiktok" android:layout_width="wrap_content"
+                android:layout_height="36dp" android:text="Verbinden" android:textSize="12sp"
+                android:backgroundTint="#00F2EA" />
+        </LinearLayout>
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="@color/divider" android:layout_marginBottom="16dp" />
+        <EditText android:id="@+id/et_title" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:hint="Titel des Videos"
+            android:textColor="@color/white" android:textColorHint="@color/text_secondary"
+            android:background="@drawable/edit_text_bg" android:padding="12dp"
+            android:layout_marginBottom="8dp" android:inputType="text" />
+        <EditText android:id="@+id/et_description" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:hint="Beschreibung"
+            android:textColor="@color/white" android:textColorHint="@color/text_secondary"
+            android:background="@drawable/edit_text_bg" android:padding="12dp" android:minLines="3"
+            android:layout_marginBottom="8dp" android:inputType="textMultiLine" android:gravity="top" />
+        <EditText android:id="@+id/et_tags" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:hint="Tags (kommagetrennt)"
+            android:textColor="@color/white" android:textColorHint="@color/text_secondary"
+            android:background="@drawable/edit_text_bg" android:padding="12dp"
+            android:layout_marginBottom="16dp" android:inputType="text" />
+        <CheckBox android:id="@+id/cb_youtube" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="Auf YouTube Shorts hochladen"
+            android:textColor="@color/white" android:checked="true" android:enabled="false"
+            android:layout_marginBottom="4dp" />
+        <CheckBox android:id="@+id/cb_tiktok" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="Auf TikTok hochladen"
+            android:textColor="@color/white" android:checked="true" android:enabled="false"
+            android:layout_marginBottom="16dp" />
+        <Button android:id="@+id/btn_upload" android:layout_width="match_parent"
+            android:layout_height="56dp" android:text="🚀 HOCHLADEN" android:textSize="18sp"
+            android:textStyle="bold" android:backgroundTint="@color/accent"
+            android:layout_marginBottom="16dp" />
+        <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="@color/accent" android:textSize="14sp"
+            android:textAlignment="center" android:layout_marginBottom="8dp" />
+        <ProgressBar android:id="@+id/progress_youtube" style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="8dp" android:max="100"
+            android:visibility="gone" android:progressTint="#FF0000" />
+        <ProgressBar android:id="@+id/progress_tiktok" style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="8dp" android:max="100"
+            android:visibility="gone" android:progressTint="#00F2EA" android:layout_marginBottom="16dp" />
+        <LinearLayout android:id="@+id/layout_results" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone"
+            android:background="@drawable/rounded_card" android:padding="16dp">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Ergebnisse" android:textColor="@color/accent" android:textStyle="bold"
+                android:textSize="16sp" android:layout_marginBottom="8dp" />
+            <TextView android:id="@+id/tv_results" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

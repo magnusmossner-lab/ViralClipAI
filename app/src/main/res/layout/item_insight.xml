@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:background="@drawable/rounded_card"
+    android:padding="12dp" android:layout_marginBottom="8dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/tv_insight_category" android:layout_width="0dp"
+            android:layout_height="wrap_content" android:layout_weight="1"
+            android:textColor="@color/accent" android:textSize="14sp" android:textStyle="bold" />
+        <TextView android:id="@+id/tv_insight_score" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:textColor="@color/white"
+            android:textSize="14sp" android:textStyle="bold" />
+    </LinearLayout>
+    <ProgressBar android:id="@+id/progress_insight_score" style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent" android:layout_height="6dp" android:max="100"
+        android:progressTint="@color/accent" android:layout_marginTop="4dp" android:layout_marginBottom="4dp" />
+    <TextView android:id="@+id/tv_insight_recommendation" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:textColor="@color/text_secondary" android:textSize="12sp" />
+</LinearLayout>
