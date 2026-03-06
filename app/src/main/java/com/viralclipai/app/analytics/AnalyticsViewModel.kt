@@ -16,7 +16,7 @@ class AnalyticsViewModel : ViewModel() {
 
     companion object {
         private const val TAG = "AnalyticsVM"
-        private const val BASE_URL = "http://10.0.2.2:8000"
+        private const val BASE_URL = "https://viralclipai-production.up.railway.app"
     }
 
     data class AnalyticsState(
