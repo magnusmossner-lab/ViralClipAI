@@ -9,8 +9,8 @@ android {
         applicationId = "com.viralclipai.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "4.2.0"
+        versionCode = 7
+        versionName = "5.0.0"
     }
     buildTypes {
         release {
@@ -35,6 +35,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.activity:activity-compose:1.8.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.navigation:navigation-compose:2.7.5")
     // Network
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -52,4 +53,12 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     // Google Fonts for subtitle customization
     implementation("androidx.compose.ui:ui-text-google-fonts:1.5.4")
+    // WorkManager (for AnalyticsSyncWorker)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    // Security Crypto (for OAuthManager encrypted prefs)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    // AppCompat (for UploadActivity, AnalyticsDashboardActivity)
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    // RecyclerView (for AnalyticsDashboardActivity)
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
 }

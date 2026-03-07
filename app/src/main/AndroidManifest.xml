@@ -24,7 +24,6 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Deep link for social media callbacks -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -32,10 +31,15 @@
                 <data android:scheme="viralclipai"/>
             </intent-filter>
         </activity>
+        <activity
+            android:name=".upload.UploadActivity"
+            android:theme="@style/Theme.ViralClipAI"/>
+        <activity
+            android:name=".analytics.AnalyticsDashboardActivity"
+            android:theme="@style/Theme.ViralClipAI"/>
         <service
             android:name=".service.ClipProcessingService"
             android:foregroundServiceType="dataSync"/>
-        <!-- File provider for sharing videos to social apps -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
