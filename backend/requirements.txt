@@ -1,9 +1,4 @@
-fastapi>=0.104.0
-uvicorn>=0.24.0
-pydantic>=2.5.0
-apscheduler>=3.10.4
-yt-dlp>=2024.1.0
-openai-whisper>=20231117
-faster-whisper>=0.10.0
-python-multipart>=0.0.6
-numpy<2.0
+{
+  "log": "requirements.txt updated\n",
+  "exitCode": 0
+}
