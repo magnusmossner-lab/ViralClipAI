@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app code
 COPY main.py .
 COPY pipeline.py .
-COPY app/ app/ 2>/dev/null || true
+COPY app/ app/
 
 RUN mkdir -p /tmp/viralclip_clips
 
