@@ -7,7 +7,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
-    private var baseUrl = "https://viralclipai-production.up.railway.app/"  // Android emulator -> localhost
+    private var baseUrl = "https://viralclipai-backend-production.up.railway.app/"
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
