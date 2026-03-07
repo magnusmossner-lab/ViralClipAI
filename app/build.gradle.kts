@@ -24,7 +24,7 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
-    composeOptions { kotlinCompilerExtensionVersion = "1.5.5" }
+    composeOptions { kotlinCompilerExtensionVersion = "1.5.4" }
 }
 dependencies {
     val bom = platform("androidx.compose:compose-bom:2023.10.01")
@@ -56,7 +56,7 @@ dependencies {
     // WorkManager (for AnalyticsSyncWorker)
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     // Security Crypto (for OAuthManager encrypted prefs)
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.security:security-crypto:1.0.0")
     // AppCompat (for UploadActivity, AnalyticsDashboardActivity)
     implementation("androidx.appcompat:appcompat:1.6.1")
     // RecyclerView (for AnalyticsDashboardActivity)
