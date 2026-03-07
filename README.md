@@ -1,105 +1,75 @@
-# 🎬 ViralClipAI
+# 🔥 ViralClip AI v4.2
+**YouTube → Virale 9:16 Clips mit Karaoke-Untertiteln & Content-Filtern**
 
-> YouTube-Videos automatisch in virale 9:16 Clips schneiden & auf YouTube Shorts + TikTok hochladen.
+## Was ist neu in v4.2?
+- 🎤 **Karaoke-Untertitel** – Wort-für-Wort-Highlighting (wie OpusClip/Zarbex)
+- 💬 **Hook-Captions** – Weißer Kasten oben (erste 3 Sekunden)
+- 🎯 **Content-Filter** – Sprache, Schlüsselwörter, Thema, Viral-Empfindlichkeit
+- 🎨 **Untertitel-Anpassung** – 6 Schriftarten, 8 Farben, 6 Highlight-Farben, 4 Größen, 5 Stile
+- 📱 **Social Media Upload** – Direkt auf TikTok/YouTube/Instagram unter jedem Clip
+- 🔊 **Video-Vorschau mit Ton** – ExoPlayer mit Audio
+- 🎬 **Auto-Cut** – Face-Zoom bei Reaktionen
 
 ## Features
+| Feature | Beschreibung |
+|---------|-------------|
+| 🎤 Karaoke-Untertitel | Aktuelles Wort hervorgehoben (Grün/Gelb/Custom) |
+| 💬 Hook-Caption | Weißer Kasten, schwarze Schrift, erste 3s |
+| 🎯 Content-Filter | Sprache, Keywords, Themen (Kontrovers, Drama, Realtalk...) |
+| ⚡ Viral-Empfindlichkeit | Wenig (1-3), Mittel (3-6), Viel (6-12) Clips |
+| 📱 Social Upload | TikTok, YouTube, Instagram direkt aus der App |
+| 🔊 Vorschau mit Ton | ExoPlayer Video-Preview |
+| 🤖 Auto-Cut | Gesichts-Zoom bei Reaktionen |
+| 📐 9:16 Format | Für TikTok/Reels/Shorts |
+| 🧠 Selbstlernende KI | Verbessert sich durch Feedback |
+| 🩹 Self-Healing | Automatische Fehlerbehebung |
 
-- 🤖 **KI-gestützte Clip-Erkennung** – Erkennt automatisch die viralsten Momente
-- 📐 **9:16 Konvertierung** – Automatische Anpassung für Shorts/TikTok
-- 📝 **Auto-Untertitel** – Generiert automatisch Untertitel
-- 🎬 **B-Roll Effekte** – Optionale visuelle Effekte
-- 🚀 **Multi-Platform Upload** – YouTube Shorts + TikTok
-- 📊 **Analytics Dashboard** – Verfolge Views, Likes, Engagement
-- 🧠 **ML Feedback Loop** – Die KI lernt aus deinen Upload-Daten
+### Untertitel-Optionen
+| Kategorie | Optionen |
+|-----------|----------|
+| **Schriftarten** | Anton, Bebas Neue, Montserrat, Oswald, Poppins, Bangers |
+| **Textfarben** | Weiß, Gelb, Cyan, Grün, Rot, Orange, Pink, Lila |
+| **Highlight** | Neon-Grün, Gelb, Cyan, Rot, Orange, Hot Pink |
+| **Größen** | Klein (36px), Mittel (48px), Groß (64px), XL (80px) |
+| **Stile** | 🎤 Karaoke, 📝 Klassisch, ✨ Neon Glow, 🔲 Box, 🔤 Outline |
 
-## Architektur
+### Content-Filter
+| Filter | Optionen |
+|--------|----------|
+| **Sprache** | Auto, Deutsch, English, Türkçe, العربية, Español, Français |
+| **Thema** | Alle, Kontrovers, Emotional, Lustig, Realtalk, Drama, Motivation, Skandal |
+| **Keywords** | Eigene + KI-Vorschläge passend zum Thema |
+| **Empfindlichkeit** | Wenig (1-3), Mittel (3-6), Viel (6-12) |
 
-```
-┌──────────────────┐     ┌──────────────────┐
-│  Android App     │────▶│  Python Backend   │
-│  (Kotlin/Compose)│◀────│  (FastAPI)        │
-└──────────────────┘     └──────────────────┘
-        │                         │
-        ▼                         ▼
-  YouTube API              ffmpeg + yt-dlp
-  TikTok API               Video Processing
-```
+### Trainiert auf: Zarbex, Schradin, Elotrix, Papaplatte
+### Kein Schimpfwort-Filter!
 
-## Quick Start
+## Setup
 
 ### 1. Backend starten
-
-```bash
-cd backend
-docker-compose up -d
-```
-
-Oder ohne Docker:
 ```bash
 cd backend
 pip install -r requirements.txt
-# ffmpeg und yt-dlp müssen installiert sein
-python main.py
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Oder via Docker:
+docker-compose up -d
 ```
 
-Backend läuft dann auf `http://localhost:8000`
-
-### 2. App installieren
-
+### 2. App builden
 ```bash
-# APK von GitHub Actions herunterladen oder lokal bauen:
 ./gradlew assembleDebug
-adb install app/build/outputs/apk/debug/app-debug.apk
+# APK: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### 3. Server-URL konfigurieren
+### 3. Benutzen
+1. App öffnen → verbindet automatisch mit Server
+2. YouTube-Link einfügen
+3. Content-Filter einstellen (Sprache, Keywords, Thema)
+4. Untertitel-Stil wählen (Schrift, Farbe, Größe)
+5. "CLIPS ERSTELLEN" drücken
+6. Clips ansehen (mit Ton!) und direkt uploaden
 
-In der App unter **Einstellungen** die IP deines Servers eingeben:
-- Emulator: `http://10.0.2.2:8000`
-- Lokales Netzwerk: `http://DEINE-IP:8000`
-
-### 4. API-Keys einrichten (für Upload-Funktion)
-
-#### YouTube / Google OAuth2
-1. [Google Cloud Console](https://console.cloud.google.com/) → Neues Projekt
-2. **YouTube Data API v3** aktivieren
-3. OAuth 2.0 Client ID erstellen (Android-App)
-4. Package Name: `com.viralclipai.app`
-5. `client_id` und `client_secret` in `app/src/main/assets/oauth_config.json` eintragen
-
-#### TikTok
-1. [TikTok Developer Portal](https://developers.tiktok.com/) → App registrieren
-2. **Content Posting API** beantragen
-3. Callback URL: `com.viralclipai.app://oauth/callback`
-4. `client_key` in `oauth_config.json` eintragen
-
-## API Endpoints
-
-| Endpoint | Methode | Beschreibung |
-|----------|---------|-------------|
-| `/health` | GET | Server-Status |
-| `/api/process` | POST | Video verarbeiten |
-| `/api/job/{id}` | GET | Job-Status |
-| `/api/clip/{id}/download` | GET | Clip herunterladen |
-| `/api/feedback` | POST | Clip bewerten |
-| `/api/v1/analytics/summary` | GET | Analytics-Übersicht |
-| `/api/v1/analytics/insights` | GET | KI-Empfehlungen |
-
-## Tech Stack
-
-**Android App:**
-- Kotlin 1.9.20
-- Jetpack Compose (Material3)
-- Retrofit + OkHttp
-- WorkManager
-- EncryptedSharedPreferences
-
-**Backend:**
-- Python 3.12
-- FastAPI
-- ffmpeg
-- yt-dlp
-
-## Lizenz
-
-Private Nutzung – © 2026 magnusmossner-lab
+## Anforderungen
+- Android 8.0+ (API 26+)
+- Python 3.11+, FFmpeg, ~4GB RAM
+- whisper-timestamped oder faster-whisper

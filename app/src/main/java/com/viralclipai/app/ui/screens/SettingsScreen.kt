@@ -1,87 +1,45 @@
 package com.viralclipai.app.ui.screens
 
-import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.viralclipai.app.data.api.ApiClient
-import com.viralclipai.app.upload.UploadActivity
-import com.viralclipai.app.analytics.AnalyticsDashboardActivity
 import com.viralclipai.app.viewmodel.MainViewModel
 
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-    val connected by viewModel.serverConnected.collectAsState()
-    val context = LocalContext.current
-    var serverUrl by remember { mutableStateOf(ApiClient.getBaseUrl()) }
-    val scrollState = rememberScrollState()
+    val serverConnected by viewModel.serverConnected.collectAsState()
+    var serverUrl by remember { mutableStateOf("http://10.0.2.2:8000") }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(scrollState).padding(20.dp)
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
     ) {
-        Text("Einstellungen", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+        Text("\u2699\uFE0F Einstellungen", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(24.dp))
 
-        // Upload & Analytics Buttons
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp)
-        ) {
+        // Server
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(Modifier.padding(16.dp)) {
-                Text("Upload & Analytics", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = { context.startActivity(Intent(context, UploadActivity::class.java)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.Upload, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Clip hochladen (YT/TikTok)")
-                }
+                Text("\uD83C\uDF10 Server", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { context.startActivity(Intent(context, AnalyticsDashboardActivity::class.java)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.Analytics, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Analytics Dashboard")
-                }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-
-        // Server Connection
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Server-Verbindung", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = serverUrl,
                     onValueChange = { serverUrl = it },
-                    label = { Text("Server-URL") },
+                    label = { Text("Server URL") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
                 )
                 Spacer(Modifier.height(8.dp))
                 Button(
@@ -89,66 +47,81 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(if (connected) Icons.Default.Cloud else Icons.Default.CloudOff, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (connected) "Verbunden \u2713" else "Verbinden")
+                    Text(if (serverConnected) "Verbunden \u2713" else "Verbinden")
                 }
             }
         }
         Spacer(Modifier.height(16.dp))
 
-        // Clip Settings
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp)
-        ) {
+        // Clip Duration
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(Modifier.padding(16.dp)) {
-                Text("Clip-Einstellungen", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("\u23F1 Clip-Dauer", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
-                Text("Min. Dauer: ${uiState.minDuration}s", fontSize = 14.sp)
+                Text("Min: ${uiState.minDuration}s")
                 Slider(
                     value = uiState.minDuration.toFloat(),
                     onValueChange = { viewModel.updateSettings(minDuration = it.toInt()) },
                     valueRange = 15f..120f,
                     steps = 20
                 )
-                Text("Max. Dauer: ${uiState.maxDuration}s", fontSize = 14.sp)
+                Text("Max: ${uiState.maxDuration}s")
                 Slider(
                     value = uiState.maxDuration.toFloat(),
                     onValueChange = { viewModel.updateSettings(maxDuration = it.toInt()) },
-                    valueRange = 30f..300f,
-                    steps = 26
+                    valueRange = 30f..180f,
+                    steps = 29
                 )
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("B-Roll Effekte", fontSize = 14.sp)
-                    Switch(checked = uiState.brollEnabled, onCheckedChange = { viewModel.updateSettings(broll = it) })
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Auto-Captions", fontSize = 14.sp)
-                    Switch(checked = uiState.autoCaptions, onCheckedChange = { viewModel.updateSettings(captions = it) })
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Auto-Untertitel", fontSize = 14.sp)
-                    Switch(checked = uiState.autoSubtitles, onCheckedChange = { viewModel.updateSettings(subtitles = it) })
-                }
             }
         }
         Spacer(Modifier.height(16.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp)
-        ) {
+        // KI Features
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(Modifier.padding(16.dp)) {
-                Text("ViralClip AI v3.0", fontWeight = FontWeight.Bold)
-                Text("Robuste Video-Verarbeitung \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Video-Vorschau mit ExoPlayer \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Galerie-Download mit Validierung \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("YouTube + TikTok Upload \u2713", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("\uD83E\uDD16 KI-Features", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Toggle("Auto-Cut", "Gesichtserkennung + Zoom", uiState.autoCut) { viewModel.updateSettings(autoCut = it) }
+                Toggle("Untertitel", "Karaoke-Stil (Wort für Wort)", uiState.autoSubtitles) { viewModel.updateSettings(subtitles = it) }
+                Toggle("Hook-Captions", "Caption in ersten 3s", uiState.autoCaptions) { viewModel.updateSettings(captions = it) }
             }
         }
+        Spacer(Modifier.height(16.dp))
+
+        // Info
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Column(Modifier.padding(16.dp)) {
+                Text("ViralClip AI v4.2", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                listOf(
+                    "9:16 Hochformat für TikTok/Reels/Shorts",
+                    "Karaoke-Untertitel mit Wort-Highlighting",
+                    "Content-Filter: Sprache, Keywords, Themen",
+                    "Direkt auf Social Media uploaden",
+                    "Clips 1h auf Server gespeichert",
+                    "KI lernt aus Downloads & Bewertungen",
+                    "Trainiert auf Zarbex/Schradin/Elotrix/Papaplatte",
+                    "Kein Schimpfwort-Filter!",
+                    "Self-Healing Bug-Fix Engine"
+                ).forEach { Text("\u2022 $it", fontSize = 13.sp) }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+fun Toggle(title: String, sub: String, checked: Boolean, onToggle: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Medium)
+            Text(sub, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onToggle)
     }
 }

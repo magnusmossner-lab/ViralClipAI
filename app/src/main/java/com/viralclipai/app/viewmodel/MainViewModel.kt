@@ -1,18 +1,13 @@
 package com.viralclipai.app.viewmodel
 
 import android.app.Application
-import android.content.ContentValues
-import android.media.MediaScannerConnection
-import android.os.Build
+import android.content.Intent
 import android.os.Environment
-import android.provider.MediaStore
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.viralclipai.app.data.api.ApiClient
 import com.viralclipai.app.data.models.*
 import com.viralclipai.app.data.repository.ClipRepository
-import com.viralclipai.app.util.isYouTubeUrl
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,13 +22,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val clips: StateFlow<List<ClipData>> = _clips
     private val _serverConnected = MutableStateFlow(false)
     val serverConnected: StateFlow<Boolean> = _serverConnected
-
-    companion object {
-        private const val TAG = "MainViewModel"
-        private const val MAX_RETRIES = 3
-        private const val RETRY_DELAY_MS = 2000L
-        private const val MIN_VIDEO_SIZE = 50_000  // 50KB minimum for valid video
-    }
+    private val _contentFilter = MutableStateFlow(ContentFilter())
+    val contentFilter: StateFlow<ContentFilter> = _contentFilter
+    private val _subtitleConfig = MutableStateFlow(SubtitleConfig())
+    val subtitleConfig: StateFlow<SubtitleConfig> = _subtitleConfig
+    private val _captionConfig = MutableStateFlow(CaptionConfig())
+    val captionConfig: StateFlow<CaptionConfig> = _captionConfig
+    private val _socialAccounts = MutableStateFlow<List<SocialAccount>>(emptyList())
+    val socialAccounts: StateFlow<List<SocialAccount>> = _socialAccounts
 
     data class UiState(
         val isProcessing: Boolean = false,
@@ -43,278 +39,268 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val currentJobId: String? = null,
         val downloadingClipId: String? = null,
         val downloadSuccess: String? = null,
+        val uploadingClipId: String? = null,
+        val uploadPlatform: String? = null,
         val minDuration: Int = 30,
         val maxDuration: Int = 180,
-        val brollEnabled: Boolean = true,
+        val autoCut: Boolean = true,
         val autoCaptions: Boolean = true,
         val autoSubtitles: Boolean = true
     )
 
-    init {
-        connectToServer()
-    }
+    init { connectToServer() }
 
     fun connectToServer() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(statusText = "Verbinde mit Server...")
-            val connected = retryWithBackoff { repo.checkServer() }
-            _serverConnected.value = connected
+            val c = repo.checkServer()
+            _serverConnected.value = c
             _uiState.value = _uiState.value.copy(
-                statusText = if (connected) "Server verbunden" else "Server nicht erreichbar",
-                error = if (!connected) "Server nicht erreichbar. Pruefe deine Internetverbindung." else null
+                statusText = if (c) "Server verbunden" else "Server nicht erreichbar",
+                error = if (!c) "Server nicht erreichbar. Bitte Backend starten." else null
             )
         }
     }
 
-    fun setServerUrl(url: String) {
-        ApiClient.setBaseUrl(url)
-        connectToServer()
+    fun setServerUrl(url: String) { ApiClient.setBaseUrl(url); connectToServer() }
+
+    // ─── Content Filter ───
+    fun updateContentFilter(
+        language: String? = null,
+        keywords: List<String>? = null,
+        mood: String? = null,
+        viralSensitivity: String? = null
+    ) {
+        val f = _contentFilter.value
+        _contentFilter.value = f.copy(
+            language = language ?: f.language,
+            keywords = keywords ?: f.keywords,
+            mood = mood ?: f.mood,
+            viralSensitivity = viralSensitivity ?: f.viralSensitivity
+        )
     }
 
+    fun addKeyword(keyword: String) {
+        val trimmed = keyword.trim()
+        if (trimmed.isNotEmpty()) {
+            val current = _contentFilter.value.keywords.toMutableList()
+            if (!current.contains(trimmed)) {
+                current.add(trimmed)
+                _contentFilter.value = _contentFilter.value.copy(keywords = current)
+            }
+        }
+    }
+
+    fun removeKeyword(keyword: String) {
+        val current = _contentFilter.value.keywords.toMutableList()
+        current.remove(keyword)
+        _contentFilter.value = _contentFilter.value.copy(keywords = current)
+    }
+
+    // ─── Subtitle Config ───
+    fun updateSubtitleConfig(
+        fontFamily: String? = null,
+        fontSize: String? = null,
+        textColor: String? = null,
+        highlightColor: String? = null,
+        style: String? = null
+    ) {
+        val s = _subtitleConfig.value
+        _subtitleConfig.value = s.copy(
+            fontFamily = fontFamily ?: s.fontFamily,
+            fontSize = fontSize ?: s.fontSize,
+            textColor = textColor ?: s.textColor,
+            highlightColor = highlightColor ?: s.highlightColor,
+            style = style ?: s.style
+        )
+    }
+
+    // ─── Caption Config ───
+    fun updateCaptionConfig(enabled: Boolean? = null, text: String? = null) {
+        val c = _captionConfig.value
+        _captionConfig.value = c.copy(
+            enabled = enabled ?: c.enabled,
+            text = text ?: c.text
+        )
+    }
+
+    // ─── Settings ───
     fun updateSettings(
-        minDuration: Int? = null, maxDuration: Int? = null,
-        broll: Boolean? = null, captions: Boolean? = null, subtitles: Boolean? = null
+        minDuration: Int? = null,
+        maxDuration: Int? = null,
+        autoCut: Boolean? = null,
+        captions: Boolean? = null,
+        subtitles: Boolean? = null
     ) {
         val s = _uiState.value
         _uiState.value = s.copy(
             minDuration = minDuration ?: s.minDuration,
             maxDuration = maxDuration ?: s.maxDuration,
-            brollEnabled = broll ?: s.brollEnabled,
+            autoCut = autoCut ?: s.autoCut,
             autoCaptions = captions ?: s.autoCaptions,
             autoSubtitles = subtitles ?: s.autoSubtitles
         )
     }
 
+    // ─── Process Video ───
     fun processVideo(url: String) {
-        _uiState.value = _uiState.value.copy(error = null, downloadSuccess = null)
-
-        if (url.isBlank()) {
-            _uiState.value = _uiState.value.copy(error = "Bitte eine URL eingeben")
-            return
-        }
-
-        if (!url.isYouTubeUrl()) {
-            _uiState.value = _uiState.value.copy(error = "Keine gueltige YouTube-URL")
-            return
-        }
-
+        if (url.isBlank()) { _uiState.value = _uiState.value.copy(error = "Bitte YouTube-Link eingeben"); return }
         viewModelScope.launch {
-            try {
-                val s = _uiState.value
-                _uiState.value = s.copy(isProcessing = true, progress = 0, statusText = "Starte...")
+            _uiState.value = _uiState.value.copy(isProcessing = true, progress = 0, statusText = "Video wird analysiert...", error = null)
+            val s = _uiState.value
+            val cf = _contentFilter.value
+            val sc = _subtitleConfig.value
+            val cc = _captionConfig.value
 
-                val response = repo.processVideo(
-                    url = url,
-                    minDuration = s.minDuration,
-                    maxDuration = s.maxDuration,
-                    brollEnabled = s.brollEnabled,
-                    autoCaptions = s.autoCaptions,
-                    autoSubtitles = s.autoSubtitles
-                )
-
-                val jobId = response.jobId
-                _uiState.value = _uiState.value.copy(currentJobId = jobId, statusText = "Job gestartet...")
-
-                var consecutiveErrors = 0
-                while (true) {
-                    delay(2000)
-                    try {
-                        val status = repo.getJobStatus(jobId)
-                        _uiState.value = _uiState.value.copy(
-                            progress = status.progress,
-                            statusText = translateStatus(status.status)
-                        )
-                        consecutiveErrors = 0
-
-                        when (status.status) {
-                            "done" -> {
-                                if (status.clips.isEmpty()) {
-                                    _uiState.value = _uiState.value.copy(
-                                        isProcessing = false,
-                                        error = "Keine Clips erstellt. Versuche ein anderes Video."
-                                    )
-                                } else {
-                                    _clips.value = status.clips
-                                    _uiState.value = _uiState.value.copy(
-                                        isProcessing = false, progress = 100,
-                                        statusText = "${status.clips.size} Clips erstellt! Wechsle zum Clips-Tab."
-                                    )
-                                }
-                                break
-                            }
-                            "error" -> {
-                                _uiState.value = _uiState.value.copy(
-                                    isProcessing = false,
-                                    error = status.error ?: "Unbekannter Fehler"
-                                )
-                                break
-                            }
-                        }
-                    } catch (e: Exception) {
-                        consecutiveErrors++
-                        if (consecutiveErrors >= 5) {
-                            _uiState.value = _uiState.value.copy(
-                                isProcessing = false,
-                                error = "Verbindung verloren: ${e.message}"
-                            )
-                            break
-                        }
-                        Log.w(TAG, "Poll error #$consecutiveErrors: ${e.message}")
-                        delay(RETRY_DELAY_MS)
-                    }
+            val req = ProcessRequest(
+                url = url,
+                minDuration = s.minDuration,
+                maxDuration = s.maxDuration,
+                autoCut = s.autoCut,
+                autoCaption = s.autoCaptions && cc.enabled,
+                autoSubtitle = s.autoSubtitles,
+                language = cf.language,
+                keywords = cf.keywords,
+                mood = cf.mood,
+                viralSensitivity = cf.viralSensitivity,
+                subtitleFont = sc.fontFamily,
+                subtitleSize = sc.fontSize,
+                subtitleColor = sc.textColor,
+                subtitleHighlight = sc.highlightColor,
+                subtitleStyle = sc.style,
+                captionText = cc.text
+            )
+            repo.processVideo(req).fold(
+                onSuccess = {
+                    _uiState.value = _uiState.value.copy(currentJobId = it.jobId, statusText = "KI schneidet Clips...")
+                    pollJob(it.jobId)
+                },
+                onFailure = {
+                    _uiState.value = _uiState.value.copy(isProcessing = false, error = "Fehler: ${it.message}", statusText = "Fehler")
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Process error", e)
-                _uiState.value = _uiState.value.copy(
-                    isProcessing = false,
-                    error = "Fehler: ${e.message}"
+            )
+        }
+    }
+
+    private fun pollJob(jobId: String) {
+        viewModelScope.launch {
+            while (true) {
+                delay(2000)
+                repo.getJobStatus(jobId).fold(
+                    onSuccess = { st ->
+                        _uiState.value = _uiState.value.copy(
+                            progress = st.progress,
+                            statusText = when (st.status) {
+                                "downloading" -> "Video wird heruntergeladen... ${st.progress}%"
+                                "analyzing" -> "KI analysiert Sprache & Keywords... ${st.progress}%"
+                                "cutting" -> "Clips werden geschnitten... ${st.progress}%"
+                                "subtitling" -> "Karaoke-Untertitel... ${st.progress}%"
+                                "captioning" -> "Hook-Captions... ${st.progress}%"
+                                "auto_cut" -> "Auto-Cut Gesichtserkennung... ${st.progress}%"
+                                "ranking" -> "Viral-Ranking... ${st.progress}%"
+                                "done" -> "Fertig! ${st.clips.size} Clips"
+                                "error" -> "Fehler: ${st.error}"
+                                else -> "Verarbeitung... ${st.progress}%"
+                            }
+                        )
+                        if (st.status == "done") {
+                            _clips.value = st.clips.sortedByDescending { it.viralityScore }
+                            _uiState.value = _uiState.value.copy(isProcessing = false)
+                            return@launch
+                        }
+                        if (st.status == "error") {
+                            _uiState.value = _uiState.value.copy(isProcessing = false, error = st.error)
+                            return@launch
+                        }
+                    },
+                    onFailure = {
+                        _uiState.value = _uiState.value.copy(isProcessing = false, error = "Verbindung verloren")
+                        return@launch
+                    }
                 )
             }
         }
     }
 
-    fun downloadClip(clipId: String) {
+    // ─── Download ───
+    fun downloadClip(clip: ClipData) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(downloadingClipId = clip.id, downloadSuccess = null)
+            repo.downloadClip(clip.id).fold(
+                onSuccess = { bytes ->
+                    val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    val file = File(dir, "ViralClip_${clip.id}.mp4")
+                    file.writeBytes(bytes)
+                    repo.sendFeedback(clip.id, 5, true)
+                    _uiState.value = _uiState.value.copy(downloadingClipId = null, downloadSuccess = "${clip.title} gespeichert")
+                },
+                onFailure = {
+                    _uiState.value = _uiState.value.copy(downloadingClipId = null, error = "Download fehlgeschlagen")
+                }
+            )
+        }
+    }
+
+    // ─── Social Media Upload ───
+    fun uploadToSocial(clip: ClipData, platform: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(uploadingClipId = clip.id, uploadPlatform = platform)
+            try {
+                // First download clip locally
+                val bytes = repo.downloadClip(clip.id).getOrThrow()
+                val dir = getApplication<Application>().cacheDir
+                val file = File(dir, "upload_${clip.id}.mp4")
+                file.writeBytes(bytes)
+
+                // Create share intent based on platform
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "video/mp4"
+                    putExtra(Intent.EXTRA_STREAM, android.net.Uri.fromFile(file))
+                    putExtra(Intent.EXTRA_TEXT, clip.caption)
+                    when (platform) {
+                        "tiktok" -> setPackage("com.zhiliaoapp.musically")
+                        "youtube" -> setPackage("com.google.android.youtube")
+                        "instagram" -> setPackage("com.instagram.android")
+                    }
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                getApplication<Application>().startActivity(shareIntent)
+                _uiState.value = _uiState.value.copy(uploadingClipId = null, uploadPlatform = null)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    uploadingClipId = null,
+                    uploadPlatform = null,
+                    error = "Upload fehlgeschlagen: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun shareClip(clip: ClipData) {
         viewModelScope.launch {
             try {
-                _uiState.value = _uiState.value.copy(
-                    downloadingClipId = clipId,
-                    downloadSuccess = null,
-                    error = null
-                )
-
-                Log.i(TAG, "Starting download for clip: $clipId")
-                val bytes = repo.downloadClip(clipId)
-
-                // Validate: real video must be > 50KB
-                if (bytes.size < MIN_VIDEO_SIZE) {
-                    Log.e(TAG, "Download too small: ${bytes.size} bytes (expected > $MIN_VIDEO_SIZE)")
-                    _uiState.value = _uiState.value.copy(
-                        downloadingClipId = null,
-                        error = "Download fehlgeschlagen: Datei zu klein (${bytes.size} Bytes). Der Clip ist moeglicherweise abgelaufen."
-                    )
-                    return@launch
+                val bytes = repo.downloadClip(clip.id).getOrThrow()
+                val dir = getApplication<Application>().cacheDir
+                val file = File(dir, "share_${clip.id}.mp4")
+                file.writeBytes(bytes)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "video/mp4"
+                    putExtra(Intent.EXTRA_STREAM, android.net.Uri.fromFile(file))
+                    putExtra(Intent.EXTRA_TEXT, clip.caption)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-
-                // Validate: check MP4 magic bytes
-                if (bytes.size >= 8) {
-                    val header = String(bytes.sliceArray(4..7), Charsets.US_ASCII)
-                    if (header != "ftyp") {
-                        Log.e(TAG, "Not a valid MP4: header=$header")
-                        _uiState.value = _uiState.value.copy(
-                            downloadingClipId = null,
-                            error = "Download fehlgeschlagen: Keine gueltige Videodatei erhalten."
-                        )
-                        return@launch
-                    }
-                }
-
-                Log.i(TAG, "Download OK: ${bytes.size} bytes, saving to gallery...")
-
-                val filename = "ViralClip_${clipId}_${System.currentTimeMillis()}.mp4"
-                val app = getApplication<Application>()
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val resolver = app.contentResolver
-                    val values = ContentValues().apply {
-                        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                        put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/ViralClipAI")
-                        put(MediaStore.MediaColumns.IS_PENDING, 1)
-                        put(MediaStore.MediaColumns.DATE_ADDED, System.currentTimeMillis() / 1000)
-                        put(MediaStore.MediaColumns.DATE_MODIFIED, System.currentTimeMillis() / 1000)
-                    }
-
-                    val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-                    if (uri != null) {
-                        resolver.openOutputStream(uri)?.use { out ->
-                            out.write(bytes)
-                            out.flush()
-                        }
-
-                        val updateValues = ContentValues().apply {
-                            put(MediaStore.MediaColumns.IS_PENDING, 0)
-                        }
-                        resolver.update(uri, updateValues, null, null)
-
-                        Log.i(TAG, "Video saved via MediaStore: $uri (${bytes.size} bytes)")
-                    } else {
-                        _uiState.value = _uiState.value.copy(
-                            downloadingClipId = null,
-                            error = "Konnte Video nicht in Galerie speichern"
-                        )
-                        return@launch
-                    }
-                } else {
-                    @Suppress("DEPRECATION")
-                    val dir = File(
-                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-                        "ViralClipAI"
-                    )
-                    dir.mkdirs()
-                    val file = File(dir, filename)
-                    file.writeBytes(bytes)
-
-                    MediaScannerConnection.scanFile(
-                        app,
-                        arrayOf(file.absolutePath),
-                        arrayOf("video/mp4")
-                    ) { path, scannedUri ->
-                        Log.i(TAG, "MediaScanner indexed: $path -> $scannedUri")
-                    }
-                }
-
-                _uiState.value = _uiState.value.copy(
-                    downloadingClipId = null,
-                    downloadSuccess = "\u2705 Video in Galerie gespeichert!\nOrdner: Filme/ViralClipAI\nGroesse: ${bytes.size / 1024}KB"
+                getApplication<Application>().startActivity(
+                    Intent.createChooser(shareIntent, "Clip teilen").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "Download error", e)
-                _uiState.value = _uiState.value.copy(
-                    downloadingClipId = null,
-                    error = "Download fehlgeschlagen: ${e.message}"
-                )
+                _uiState.value = _uiState.value.copy(error = "Teilen fehlgeschlagen")
             }
         }
     }
 
     fun rateClip(clipId: String, rating: Int) {
-        viewModelScope.launch {
-            try {
-                repo.sendFeedback(clipId, rating, true)
-                Log.i(TAG, "Feedback sent: clip=$clipId, rating=$rating")
-            } catch (e: Exception) {
-                Log.w(TAG, "Feedback failed: ${e.message}")
-            }
-        }
-    }
-
-    private fun translateStatus(status: String): String = when (status) {
-        "queued" -> "In der Warteschlange..."
-        "downloading" -> "Video wird heruntergeladen..."
-        "analyzing" -> "KI analysiert Video..."
-        "cutting" -> "Clips werden geschnitten..."
-        "subtitling" -> "Untertitel werden erstellt..."
-        "captioning" -> "Captions werden generiert..."
-        "broll" -> "B-Roll Effekte..."
-        "done" -> "Fertig!"
-        "error" -> "Fehler aufgetreten"
-        else -> status.replaceFirstChar { it.uppercase() }
-    }
-
-    private suspend fun <T> retryWithBackoff(
-        maxRetries: Int = MAX_RETRIES,
-        block: suspend () -> T
-    ): T {
-        var lastException: Exception? = null
-        repeat(maxRetries) { attempt ->
-            try {
-                return block()
-            } catch (e: Exception) {
-                lastException = e
-                Log.w(TAG, "Retry ${attempt + 1}/$maxRetries: ${e.message}")
-                delay(RETRY_DELAY_MS * (attempt + 1))
-            }
-        }
-        throw lastException ?: Exception("Max retries reached")
+        viewModelScope.launch { repo.sendFeedback(clipId, rating, false) }
     }
 }
