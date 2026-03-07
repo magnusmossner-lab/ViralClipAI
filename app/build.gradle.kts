@@ -48,6 +48,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     // Google Fonts for subtitle customization
     implementation("androidx.compose.ui:ui-text-google-fonts:1.5.4")
