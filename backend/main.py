@@ -1,12 +1,13 @@
 """
-ViralClip AI v4.2 - Backend Server
+ViralClip AI v5.2.0 - Backend Server
 - Content-based clip detection (language, keywords, mood)
 - Karaoke subtitles with customization
 - Hook captions with white box
 - Auto-cut with face zoom
 - Social media ready (9:16)
+- Node.js runtime for yt-dlp YouTube support
 """
-import uuid, os, time, asyncio, logging
+import uuid, os, time, asyncio, logging, shutil, subprocess
 from datetime import datetime, timedelta
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
@@ -17,7 +18,7 @@ from pipeline import ProcessingPipeline
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("viralclip")
-app = FastAPI(title="ViralClip AI Server", version="4.2.0")
+app = FastAPI(title="ViralClip AI Server", version="5.2.0")
 pipeline = ProcessingPipeline()
 jobs = {}
 CLIP_DIR = "/tmp/viralclip_clips"
@@ -67,11 +68,29 @@ async def startup():
     s = AsyncIOScheduler()
     s.add_job(cleanup_old_clips, "interval", minutes=5)
     s.start()
+    # Log system info
+    node_path = shutil.which("node")
+    ytdlp_path = shutil.which("yt-dlp")
+    log.info(f"ViralClip AI v5.2.0 started")
+    log.info(f"Node.js: {node_path or 'NOT FOUND'}")
+    log.info(f"yt-dlp: {ytdlp_path or 'NOT FOUND'}")
+    if node_path:
+        try:
+            ver = subprocess.check_output([node_path, "--version"], timeout=5).decode().strip()
+            log.info(f"Node.js version: {ver}")
+        except Exception:
+            pass
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "4.2.0", "ai_models_loaded": pipeline.models_ready()}
+    node_available = shutil.which("node") is not None
+    return {
+        "status": "ok",
+        "version": "5.2.0",
+        "ai_models_loaded": pipeline.models_ready(),
+        "node_js": node_available
+    }
 
 
 @app.post("/api/process")
