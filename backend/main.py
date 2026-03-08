@@ -1,16 +1,17 @@
 """
-ViralClip AI v5.2.0 - Backend Server
+ViralClip AI v5.3.0 - Backend Server
 - Content-based clip detection (language, keywords, mood)
 - Karaoke subtitles with customization
 - Hook captions with white box
 - Auto-cut with face zoom
 - Social media ready (9:16)
 - Node.js runtime for yt-dlp YouTube support
+- v5.3.0: Stable connections, ping endpoint, streaming downloads
 """
 import uuid, os, time, asyncio, logging, shutil, subprocess
 from datetime import datetime, timedelta
-from fastapi import FastAPI, BackgroundTasks, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from pydantic import BaseModel
 from typing import Optional, List
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -18,7 +19,7 @@ from pipeline import ProcessingPipeline
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("viralclip")
-app = FastAPI(title="ViralClip AI Server", version="5.2.0")
+app = FastAPI(title="ViralClip AI Server", version="5.3.0")
 pipeline = ProcessingPipeline()
 jobs = {}
 CLIP_DIR = "/tmp/viralclip_clips"
@@ -71,7 +72,7 @@ async def startup():
     # Log system info
     node_path = shutil.which("node")
     ytdlp_path = shutil.which("yt-dlp")
-    log.info(f"ViralClip AI v5.2.0 started")
+    log.info(f"ViralClip AI v5.3.0 started")
     log.info(f"Node.js: {node_path or 'NOT FOUND'}")
     log.info(f"yt-dlp: {ytdlp_path or 'NOT FOUND'}")
     if node_path:
@@ -87,10 +88,16 @@ async def health():
     node_available = shutil.which("node") is not None
     return {
         "status": "ok",
-        "version": "5.2.0",
+        "version": "5.3.0",
         "ai_models_loaded": pipeline.models_ready(),
         "node_js": node_available
     }
+
+
+@app.get("/ping")
+async def ping():
+    """Lightweight keep-alive endpoint. Returns instantly to prevent Railway from sleeping."""
+    return {"pong": True, "ts": int(time.time())}
 
 
 @app.post("/api/process")
@@ -217,11 +224,71 @@ async def preview_clip(clip_id: str):
 
 
 @app.get("/api/clip/{clip_id}/download")
-async def download_clip(clip_id: str):
+async def download_clip(clip_id: str, request: Request):
+    """Download clip with Range support for resumable downloads."""
     path = os.path.join(CLIP_DIR, f"{clip_id}.mp4")
     if not os.path.exists(path):
-        raise HTTPException(404, "Clip expired")
-    return FileResponse(path, filename=f"ViralClip_{clip_id}.mp4", media_type="video/mp4")
+        raise HTTPException(404, "Clip expired or not found")
+
+    file_size = os.path.getsize(path)
+    range_header = request.headers.get("Range")
+
+    if range_header:
+        # Parse range: "bytes=start-end"
+        try:
+            range_val = range_header.replace("bytes=", "")
+            parts = range_val.split("-")
+            start = int(parts[0]) if parts[0] else 0
+            end = int(parts[1]) if parts[1] else file_size - 1
+            end = min(end, file_size - 1)
+            chunk_size = end - start + 1
+
+            def file_iterator(filepath, offset, length, chunk=1024 * 1024):
+                with open(filepath, "rb") as f:
+                    f.seek(offset)
+                    remaining = length
+                    while remaining > 0:
+                        read_size = min(chunk, remaining)
+                        data = f.read(read_size)
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            headers = {
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(chunk_size),
+                "Content-Disposition": f'attachment; filename="ViralClip_{clip_id}.mp4"',
+            }
+            return StreamingResponse(
+                file_iterator(path, start, chunk_size),
+                status_code=206,
+                headers=headers,
+                media_type="video/mp4"
+            )
+        except Exception as e:
+            log.warning(f"Range parse error: {e}, falling back to full response")
+
+    # Full file response with streaming (1MB chunks)
+    def full_file_iterator(filepath, chunk=1024 * 1024):
+        with open(filepath, "rb") as f:
+            while True:
+                data = f.read(chunk)
+                if not data:
+                    break
+                yield data
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Length": str(file_size),
+        "Content-Disposition": f'attachment; filename="ViralClip_{clip_id}.mp4"',
+    }
+    return StreamingResponse(
+        full_file_iterator(path),
+        headers=headers,
+        media_type="video/mp4"
+    )
 
 
 @app.post("/api/feedback")
