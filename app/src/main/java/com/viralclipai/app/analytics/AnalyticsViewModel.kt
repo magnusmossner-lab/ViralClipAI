@@ -3,6 +3,7 @@ package com.viralclipai.app.analytics
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.viralclipai.app.data.api.ApiClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +17,6 @@ class AnalyticsViewModel : ViewModel() {
 
     companion object {
         private const val TAG = "AnalyticsVM"
-        private const val BASE_URL = "https://viralclipai-production.up.railway.app"
     }
 
     data class AnalyticsState(
@@ -55,8 +55,10 @@ class AnalyticsViewModel : ViewModel() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
             try {
-                val summary = fetchJson("$BASE_URL/api/v1/analytics/summary")
-                val insightsResponse = fetchJson("$BASE_URL/api/v1/analytics/insights")
+                // Use dynamic base URL from ApiClient instead of hardcoded URL
+                val baseUrl = ApiClient.getBaseUrl().trimEnd('/')
+                val summary = fetchJson("$baseUrl/api/v1/analytics/summary")
+                val insightsResponse = fetchJson("$baseUrl/api/v1/analytics/insights")
 
                 val insights = mutableListOf<InsightItem>()
                 val insightsArray = insightsResponse.optJSONArray("insights")

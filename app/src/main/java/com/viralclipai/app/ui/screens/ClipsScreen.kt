@@ -24,6 +24,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.viralclipai.app.data.api.ApiClient
 import com.viralclipai.app.data.models.ClipData
 import com.viralclipai.app.ui.components.ViralityBadge
 import com.viralclipai.app.viewmodel.MainViewModel
@@ -47,7 +48,7 @@ fun ClipsScreen(viewModel: MainViewModel) {
                     Icon(Icons.Default.VideoLibrary, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(16.dp))
                     Text("Noch keine Clips", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("YouTube-Link einfügen und Start drücken!", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("YouTube-Link einf\u00FCgen und Start dr\u00FCcken!", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else {
@@ -66,7 +67,7 @@ fun ClipsScreen(viewModel: MainViewModel) {
                         viewModel = viewModel
                     )
                 }
-                item { Spacer(Modifier.height(16.dp)); Text("\u23F0 Clips nach 1h automatisch gelöscht", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { Spacer(Modifier.height(16.dp)); Text("\u23F0 Clips nach 1h automatisch gel\u00F6scht", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
     }
@@ -120,9 +121,10 @@ fun ClipCardWithPreview(
                 modifier = Modifier.fillMaxWidth().aspectRatio(9f / 16f)
             ) {
                 if (showPlayer) {
+                    // Use dynamic server URL instead of hardcoded emulator address
+                    val serverUrl = remember { ApiClient.getBaseUrl().trimEnd('/') }
                     val player = remember {
                         ExoPlayer.Builder(context).build().apply {
-                            val serverUrl = "http://10.0.2.2:8000"
                             setMediaItem(MediaItem.fromUri(Uri.parse("$serverUrl${clip.previewUrl}")))
                             prepare()
                             playWhenReady = true
@@ -169,7 +171,7 @@ fun ClipCardWithPreview(
                 Row {
                     if (clip.hasSubtitles) Text("\uD83D\uDCDD ", fontSize = 12.sp)
                     if (clip.hasCaption) Text("\uD83D\uDCAC ", fontSize = 12.sp)
-                    Text("\u23F0 1h verfügbar", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("\u23F0 1h verf\u00FCgbar", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 

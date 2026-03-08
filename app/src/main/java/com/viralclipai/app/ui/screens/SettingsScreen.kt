@@ -11,13 +11,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.viralclipai.app.data.api.ApiClient
 import com.viralclipai.app.viewmodel.MainViewModel
 
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val serverConnected by viewModel.serverConnected.collectAsState()
-    var serverUrl by remember { mutableStateOf("http://10.0.2.2:8000") }
+    // Use the actual configured server URL as default instead of emulator address
+    var serverUrl by remember { mutableStateOf(ApiClient.getBaseUrl().trimEnd('/')) }
 
     Column(
         Modifier
@@ -82,7 +84,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 Text("\uD83E\uDD16 KI-Features", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 Toggle("Auto-Cut", "Gesichtserkennung + Zoom", uiState.autoCut) { viewModel.updateSettings(autoCut = it) }
-                Toggle("Untertitel", "Karaoke-Stil (Wort für Wort)", uiState.autoSubtitles) { viewModel.updateSettings(subtitles = it) }
+                Toggle("Untertitel", "Karaoke-Stil (Wort f\u00FCr Wort)", uiState.autoSubtitles) { viewModel.updateSettings(subtitles = it) }
                 Toggle("Hook-Captions", "Caption in ersten 3s", uiState.autoCaptions) { viewModel.updateSettings(captions = it) }
             }
         }
@@ -94,7 +96,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 Text("ViralClip AI v4.2", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 listOf(
-                    "9:16 Hochformat für TikTok/Reels/Shorts",
+                    "9:16 Hochformat f\u00FCr TikTok/Reels/Shorts",
                     "Karaoke-Untertitel mit Wort-Highlighting",
                     "Content-Filter: Sprache, Keywords, Themen",
                     "Direkt auf Social Media uploaden",

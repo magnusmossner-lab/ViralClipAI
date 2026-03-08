@@ -3,6 +3,7 @@ package com.viralclipai.app.viewmodel
 import android.app.Application
 import android.content.Intent
 import android.os.Environment
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.viralclipai.app.data.api.ApiClient
@@ -249,7 +250,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         if (consecutiveErrors >= 5) {
                             _uiState.value = _uiState.value.copy(
                                 isProcessing = false,
-                                error = "Verbindung verloren – tippe auf Reconnect"
+                                error = "Verbindung verloren \u2013 tippe auf Reconnect"
                             )
                             return@launch
                         }
@@ -262,6 +263,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    // ─── Helper: Get content URI via FileProvider (fixes FileUriExposedException) ───
+    private fun getFileUri(file: File): android.net.Uri {
+        return FileProvider.getUriForFile(
+            getApplication(),
+            "${getApplication<Application>().packageName}.fileprovider",
+            file
+        )
     }
 
     // ─── Download ───
@@ -293,9 +303,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val file = File(dir, "upload_${clip.id}.mp4")
                 file.writeBytes(bytes)
 
+                val contentUri = getFileUri(file)
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "video/mp4"
-                    putExtra(Intent.EXTRA_STREAM, android.net.Uri.fromFile(file))
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
                     putExtra(Intent.EXTRA_TEXT, clip.caption)
                     when (platform) {
                         "tiktok" -> setPackage("com.zhiliaoapp.musically")
@@ -324,9 +335,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val dir = getApplication<Application>().cacheDir
                 val file = File(dir, "share_${clip.id}.mp4")
                 file.writeBytes(bytes)
+                val contentUri = getFileUri(file)
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "video/mp4"
-                    putExtra(Intent.EXTRA_STREAM, android.net.Uri.fromFile(file))
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
                     putExtra(Intent.EXTRA_TEXT, clip.caption)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
