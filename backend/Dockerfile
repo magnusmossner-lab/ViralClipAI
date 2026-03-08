@@ -47,4 +47,8 @@ RUN mkdir -p /tmp/viralclip_clips
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Increased timeouts:
+# --timeout-keep-alive 600  = keep connections alive 10 minutes (prevents Railway from killing idle connections)
+# --timeout-graceful-shutdown 30 = graceful shutdown
+# --h11-max-incomplete-event-size = handle large request bodies
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-keep-alive 600 --timeout-graceful-shutdown 30"]
