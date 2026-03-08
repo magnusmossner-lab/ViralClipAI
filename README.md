@@ -1,7 +1,7 @@
 # 🔥 ViralClip AI v4.2
 **YouTube → Virale 9:16 Clips mit Karaoke-Untertiteln & Content-Filtern**
 
-## Was ist neu in v4.2?
+## Was ist neu in v4.2? 
 - 🎤 **Karaoke-Untertitel** – Wort-für-Wort-Highlighting (wie OpusClip/Zarbex)
 - 💬 **Hook-Captions** – Weißer Kasten oben (erste 3 Sekunden)
 - 🎯 **Content-Filter** – Sprache, Schlüsselwörter, Thema, Viral-Empfindlichkeit
