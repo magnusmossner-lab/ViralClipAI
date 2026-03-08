@@ -37,7 +37,9 @@ class ProcessingPipeline:
     async def download_video(self, url, output_dir):
         output = os.path.join(output_dir, "source_%(id)s.%(ext)s")
         cmd = [
-            "yt-dlp", "-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
+            "yt-dlp",
+            "--js-runtimes", "nodejs",
+            "-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
             "--merge-output-format", "mp4", "-o", output, "--no-playlist", url
         ]
         proc = await asyncio.create_subprocess_exec(
