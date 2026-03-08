@@ -1,8 +1,11 @@
 package com.viralclipai.app.viewmodel
 
 import android.app.Application
+import android.content.ContentValues
 import android.content.Intent
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,10 +13,12 @@ import com.viralclipai.app.data.api.ApiClient
 import com.viralclipai.app.data.models.*
 import com.viralclipai.app.data.repository.ClipRepository
 import com.viralclipai.app.network.ConnectionManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -274,17 +279,79 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    // ─── Download ───
+    // ─── Save video to Gallery via MediaStore (works on all Android versions) ───
+    private suspend fun saveVideoToGallery(bytes: ByteArray, fileName: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val context = getApplication<Application>()
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    // Android 10+ - Use MediaStore (no WRITE_EXTERNAL_STORAGE needed)
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
+                        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                        put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/ViralClipAI")
+                        put(MediaStore.Video.Media.IS_PENDING, 1)
+                    }
+
+                    val resolver = context.contentResolver
+                    val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, contentValues)
+
+                    if (uri != null) {
+                        resolver.openOutputStream(uri)?.use { outputStream ->
+                            outputStream.write(bytes)
+                        }
+                        // Mark as not pending so it appears in gallery
+                        contentValues.clear()
+                        contentValues.put(MediaStore.Video.Media.IS_PENDING, 0)
+                        resolver.update(uri, contentValues, null, null)
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    // Android 9 and below - Save to Movies directory
+                    val moviesDir = File(
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                        "ViralClipAI"
+                    )
+                    if (!moviesDir.exists()) moviesDir.mkdirs()
+                    val file = File(moviesDir, fileName)
+                    file.writeBytes(bytes)
+
+                    // Notify media scanner so it appears in gallery
+                    val mediaScanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                    mediaScanIntent.data = android.net.Uri.fromFile(file)
+                    context.sendBroadcast(mediaScanIntent)
+                    true
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
+        }
+    }
+
+    // ─── Download to Gallery ───
     fun downloadClip(clip: ClipData) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(downloadingClipId = clip.id, downloadSuccess = null)
             repo.downloadClip(clip.id).fold(
                 onSuccess = { bytes ->
-                    val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    val file = File(dir, "ViralClip_${clip.id}.mp4")
-                    file.writeBytes(bytes)
-                    repo.sendFeedback(clip.id, 5, true)
-                    _uiState.value = _uiState.value.copy(downloadingClipId = null, downloadSuccess = "${clip.title} gespeichert")
+                    val fileName = "ViralClip_${clip.id}.mp4"
+                    val saved = saveVideoToGallery(bytes, fileName)
+                    if (saved) {
+                        repo.sendFeedback(clip.id, 5, true)
+                        _uiState.value = _uiState.value.copy(
+                            downloadingClipId = null,
+                            downloadSuccess = "\u2705 ${clip.title} in Galerie gespeichert!"
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            downloadingClipId = null,
+                            error = "Speichern in Galerie fehlgeschlagen. Bitte Berechtigungen pruefen."
+                        )
+                    }
                 },
                 onFailure = {
                     _uiState.value = _uiState.value.copy(downloadingClipId = null, error = "Download fehlgeschlagen: ${it.message}")
