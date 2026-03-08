@@ -6,9 +6,11 @@ import com.viralclipai.app.network.ConnectionManager
 
 class ClipRepository {
     private val api get() = ApiClient.getService()
+    // Separate service with 10-minute timeout for large video downloads
+    private val downloadApi get() = ApiClient.getDownloadService()
 
     suspend fun checkServer(): Boolean {
-        val result = ConnectionManager.executeWithRetry(maxAttempts = 2, operation = "Health-Check") {
+        val result = ConnectionManager.executeWithRetry(maxAttempts = 3, operation = "Health-Check") {
             api.healthCheck()
         }
         return result.fold(
@@ -43,14 +45,15 @@ class ClipRepository {
     }
 
     suspend fun getJobStatus(jobId: String): Result<JobStatus> {
-        return ConnectionManager.executeWithRetry(maxAttempts = 2, operation = "Job-Status") {
+        return ConnectionManager.executeWithRetry(maxAttempts = 3, operation = "Job-Status") {
             api.getJobStatus(jobId)
         }
     }
 
     suspend fun downloadClip(clipId: String): Result<ByteArray> {
+        // Use download service with 10-minute read timeout + streaming
         return ConnectionManager.executeWithRetry(maxAttempts = 3, operation = "Clip Download") {
-            api.downloadClip(clipId).bytes()
+            downloadApi.downloadClip(clipId).bytes()
         }
     }
 
