@@ -73,3 +73,4 @@ docker-compose up -d
 - Android 8.0+ (API 26+)
 - Python 3.11+, FFmpeg, ~4GB RAM
 - whisper-timestamped oder faster-whisper
+ 
