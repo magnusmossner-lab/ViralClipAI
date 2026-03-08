@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-# Install system dependencies + fonts
+# Install system dependencies + fonts + Node.js (required by yt-dlp for YouTube)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     fonts-dejavu-core \
@@ -8,7 +8,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fontconfig \
     wget \
     unzip \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js (yt-dlp needs a JS runtime for YouTube extraction)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Google Font "Anton" (used for viral-style subtitles)
 RUN mkdir -p /usr/share/fonts/truetype/google && \
@@ -24,7 +30,7 @@ RUN mkdir -p /usr/share/fonts/truetype/google && \
     rm /tmp/bebas.zip && \
     fc-cache -fv
 
-# Install yt-dlp
+# Install yt-dlp (latest version)
 RUN pip install --no-cache-dir yt-dlp
 
 WORKDIR /app
