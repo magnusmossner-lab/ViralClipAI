@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.min
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repo = ClipRepository()
@@ -220,24 +221,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun pollJob(jobId: String) {
         viewModelScope.launch {
             var consecutiveErrors = 0
-            while (true) {
-                delay(2000)
+            var totalElapsedMs = 0L
+            val maxTotalMs = 20 * 60 * 1000L  // 20 minutes max (video processing can take long)
+
+            while (totalElapsedMs < maxTotalMs) {
+                val pollDelay = when {
+                    consecutiveErrors == 0 -> 2000L   // Normal: check every 2s
+                    consecutiveErrors <= 3  -> 5000L  // Minor issue: check every 5s
+                    consecutiveErrors <= 6  -> 15000L // Bigger issue: check every 15s
+                    else                   -> 30000L  // Persistent: check every 30s
+                }
+                delay(pollDelay)
+                totalElapsedMs += pollDelay
+
                 repo.getJobStatus(jobId).fold(
                     onSuccess = { st ->
-                        consecutiveErrors = 0
+                        consecutiveErrors = 0  // Reset on success
                         _uiState.value = _uiState.value.copy(
                             progress = st.progress,
                             statusText = when (st.status) {
-                                "downloading" -> "Video wird heruntergeladen... ${st.progress}%"
-                                "analyzing" -> "KI analysiert Sprache & Keywords... ${st.progress}%"
-                                "cutting" -> "Clips werden geschnitten... ${st.progress}%"
-                                "subtitling" -> "Karaoke-Untertitel... ${st.progress}%"
-                                "captioning" -> "Hook-Captions... ${st.progress}%"
-                                "auto_cut" -> "Auto-Cut Gesichtserkennung... ${st.progress}%"
-                                "ranking" -> "Viral-Ranking... ${st.progress}%"
-                                "done" -> "Fertig! ${st.clips.size} Clips"
-                                "error" -> "Fehler: ${st.error}"
-                                else -> "Verarbeitung... ${st.progress}%"
+                                "downloading"  -> "Video wird heruntergeladen... ${st.progress}%"
+                                "analyzing"    -> "KI analysiert Sprache & Keywords... ${st.progress}%"
+                                "cutting"      -> "Clips werden geschnitten... ${st.progress}%"
+                                "subtitling"   -> "Karaoke-Untertitel... ${st.progress}%"
+                                "captioning"   -> "Hook-Captions... ${st.progress}%"
+                                "auto_cut"     -> "Auto-Cut Gesichtserkennung... ${st.progress}%"
+                                "ranking"      -> "Viral-Ranking... ${st.progress}%"
+                                "done"         -> "Fertig! ${st.clips.size} Clips"
+                                "error"        -> "Fehler: ${st.error}"
+                                else           -> "Verarbeitung... ${st.progress}%"
                             }
                         )
                         if (st.status == "done") {
@@ -250,21 +262,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             return@launch
                         }
                     },
-                    onFailure = {
+                    onFailure = { error ->
                         consecutiveErrors++
-                        if (consecutiveErrors >= 5) {
-                            _uiState.value = _uiState.value.copy(
-                                isProcessing = false,
-                                error = "Verbindung verloren \u2013 tippe auf Reconnect"
-                            )
-                            return@launch
-                        }
-                        // Kurz warten, ConnectionManager versucht reconnect
+                        // Never give up during active processing – show friendly message and keep trying
                         _uiState.value = _uiState.value.copy(
-                            statusText = "Verbindungsproblem... wird wiederhergestellt"
+                            statusText = when {
+                                consecutiveErrors <= 3 -> "Verbindung kurz unterbrochen – wird wiederhergestellt..."
+                                consecutiveErrors <= 6 -> "Server antwortet nicht – warte auf Reconnect (${consecutiveErrors}x)"
+                                else -> "Verbindungsprobleme – versuche es weiter... (${consecutiveErrors}x)"
+                            }
                         )
-                        delay(3000)
+                        // Trigger a reconnect attempt via ConnectionManager
+                        if (consecutiveErrors == 3) {
+                            ConnectionManager.reconnect()
+                        }
                     }
+                )
+            }
+
+            // Timeout after 20 minutes
+            if (_uiState.value.isProcessing) {
+                _uiState.value = _uiState.value.copy(
+                    isProcessing = false,
+                    error = "Zeitüberschreitung – der Server hat zu lange gebraucht. Bitte erneut versuchen."
                 )
             }
         }
@@ -376,8 +396,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     putExtra(Intent.EXTRA_STREAM, contentUri)
                     putExtra(Intent.EXTRA_TEXT, clip.caption)
                     when (platform) {
-                        "tiktok" -> setPackage("com.zhiliaoapp.musically")
-                        "youtube" -> setPackage("com.google.android.youtube")
+                        "tiktok"    -> setPackage("com.zhiliaoapp.musically")
+                        "youtube"   -> setPackage("com.google.android.youtube")
                         "instagram" -> setPackage("com.instagram.android")
                     }
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
