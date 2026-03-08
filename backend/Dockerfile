@@ -16,18 +16,14 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Google Font "Anton" (used for viral-style subtitles)
+# Install Google Fonts from GitHub (direct TTF download - more reliable than Google Fonts API)
 RUN mkdir -p /usr/share/fonts/truetype/google && \
-    wget -q "https://fonts.google.com/download?family=Anton" -O /tmp/anton.zip && \
-    unzip -o /tmp/anton.zip -d /usr/share/fonts/truetype/google/ && \
-    rm /tmp/anton.zip && \
-    # Also get Montserrat and Bebas Neue as alternatives
-    wget -q "https://fonts.google.com/download?family=Montserrat" -O /tmp/montserrat.zip && \
-    unzip -o /tmp/montserrat.zip -d /usr/share/fonts/truetype/google/ && \
-    rm /tmp/montserrat.zip && \
-    wget -q "https://fonts.google.com/download?family=Bebas+Neue" -O /tmp/bebas.zip && \
-    unzip -o /tmp/bebas.zip -d /usr/share/fonts/truetype/google/ && \
-    rm /tmp/bebas.zip && \
+    wget -q "https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf" \
+         -O /usr/share/fonts/truetype/google/Anton-Regular.ttf && \
+    wget -q "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf" \
+         -O /usr/share/fonts/truetype/google/Montserrat.ttf && \
+    wget -q "https://github.com/google/fonts/raw/main/ofl/bebasneue/BebasNeue-Regular.ttf" \
+         -O /usr/share/fonts/truetype/google/BebasNeue-Regular.ttf && \
     fc-cache -fv
 
 # Install yt-dlp (latest version)
