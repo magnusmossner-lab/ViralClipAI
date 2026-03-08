@@ -29,7 +29,6 @@ import com.viralclipai.app.data.models.SubtitleConfig
 import com.viralclipai.app.data.models.CaptionConfig
 import com.viralclipai.app.viewmodel.MainViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
@@ -70,7 +69,7 @@ fun HomeScreen(viewModel: MainViewModel) {
         )
         Spacer(Modifier.height(16.dp))
 
-        // ─── Tab Row: Content | Untertitel | Caption ───
+        // Tab Row
         TabRow(
             selectedTabIndex = activeTab,
             containerColor = MaterialTheme.colorScheme.surface,
@@ -90,7 +89,7 @@ fun HomeScreen(viewModel: MainViewModel) {
         }
         Spacer(Modifier.height(20.dp))
 
-        // ─── Process Button ───
+        // Process Button
         Button(
             onClick = { viewModel.processVideo(youtubeUrl) },
             enabled = !uiState.isProcessing && youtubeUrl.isNotBlank(),
@@ -113,7 +112,7 @@ fun HomeScreen(viewModel: MainViewModel) {
         if (uiState.isProcessing) {
             Spacer(Modifier.height(16.dp))
             LinearProgressIndicator(
-                progress = { uiState.progress / 100f },
+                progress = uiState.progress / 100f,
                 modifier = Modifier.fillMaxWidth().height(8.dp),
                 color = MaterialTheme.colorScheme.primary
             )
@@ -145,7 +144,7 @@ fun HomeScreen(viewModel: MainViewModel) {
     }
 }
 
-// ─── Content Filter Tab ───
+// Content Filter Tab
 @Composable
 fun ContentFilterTab(viewModel: MainViewModel, filter: ContentFilter, enabled: Boolean) {
     val languages = listOf("auto" to "\uD83C\uDF0D Auto", "de" to "\uD83C\uDE01 Deutsch", "en" to "\uD83C\uDDEC\uD83C\uDDE7 English", "tr" to "\uD83C\uDDF9\uD83C\uDDF7 Türkçe", "ar" to "\uD83C\uDDF8\uD83C\uDDE6 العربية", "es" to "\uD83C\uDDEA\uD83C\uDDF8 Español", "fr" to "\uD83C\uDDEB\uD83C\uDDF7 Français")
@@ -229,7 +228,6 @@ fun ContentFilterTab(viewModel: MainViewModel, filter: ContentFilter, enabled: B
                         }
                     }
                 }
-                // Keyword-Vorschläge basierend auf Mood
                 val suggestions = when (filter.mood) {
                     "kontrovers" -> listOf("Skandal", "Enthüllung", "Wahrheit", "Lüge", "Betrug")
                     "emotional" -> listOf("Tränen", "Gänsehaut", "Herz", "Liebe", "Abschied")
@@ -275,8 +273,7 @@ fun ContentFilterTab(viewModel: MainViewModel, filter: ContentFilter, enabled: B
     }
 }
 
-// ─── Subtitle Tab ───
-@OptIn(ExperimentalLayoutApi::class)
+// Subtitle Tab
 @Composable
 fun SubtitleTab(viewModel: MainViewModel, config: SubtitleConfig, enabled: Boolean) {
     val fonts = listOf("Anton", "Bebas Neue", "Montserrat", "Oswald", "Poppins", "Bangers")
@@ -408,7 +405,7 @@ fun SubtitleTab(viewModel: MainViewModel, config: SubtitleConfig, enabled: Boole
     }
 }
 
-// ─── Caption Tab ───
+// Caption Tab
 @Composable
 fun CaptionTab(viewModel: MainViewModel, config: CaptionConfig, enabled: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

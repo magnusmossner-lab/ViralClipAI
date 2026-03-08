@@ -22,7 +22,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi"
+        )
+    }
     buildFeatures { compose = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.4" }
 }
@@ -55,8 +61,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-text-google-fonts:1.5.4")
     // WorkManager (for AnalyticsSyncWorker)
     implementation("androidx.work:work-runtime-ktx:2.9.0")
-    // Security Crypto (for OAuthManager encrypted prefs)
-    implementation("androidx.security:security-crypto:1.0.0")
+    // Security Crypto (for OAuthManager encrypted prefs - needs 1.1.0 for MasterKey)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     // AppCompat (for UploadActivity, AnalyticsDashboardActivity)
     implementation("androidx.appcompat:appcompat:1.6.1")
     // RecyclerView (for AnalyticsDashboardActivity)
