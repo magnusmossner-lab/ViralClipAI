@@ -14,6 +14,8 @@ interface ViralClipApiService {
     @GET("api/job/{jobId}")
     suspend fun getJobStatus(@Path("jobId") jobId: String): JobStatus
 
+    /** @Streaming = don't buffer entire video in RAM – stream directly to disk */
+    @Streaming
     @GET("api/clip/{clipId}/download")
     suspend fun downloadClip(@Path("clipId") clipId: String): ResponseBody
 
