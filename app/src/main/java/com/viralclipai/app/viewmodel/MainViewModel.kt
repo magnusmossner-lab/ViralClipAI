@@ -14,6 +14,7 @@ import com.viralclipai.app.data.models.*
 import com.viralclipai.app.data.repository.ClipRepository
 import com.viralclipai.app.network.ConnectionManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +39,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val captionConfig: StateFlow<CaptionConfig> = _captionConfig
     private val _socialAccounts = MutableStateFlow<List<SocialAccount>>(emptyList())
     val socialAccounts: StateFlow<List<SocialAccount>> = _socialAccounts
+
+    /** Active keep-alive job – cancelled when processing finishes */
+    private var keepAliveJob: Job? = null
 
     // Expose ConnectionManager state to UI
     val connectionInfo: StateFlow<ConnectionManager.ConnectionInfo> = ConnectionManager.connectionInfo
@@ -67,6 +71,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _serverConnected.value = ConnectionManager.isConnected
             }
         }
+    }
+
+    // ─── Keep-Alive: Ping every 30s to prevent Railway from sleeping ───
+    private fun startKeepAlive() {
+        keepAliveJob?.cancel()
+        keepAliveJob = viewModelScope.launch {
+            while (true) {
+                delay(30_000L) // Every 30 seconds
+                try {
+                    ApiClient.getService().ping()
+                } catch (e: Exception) {
+                    // Ping failed – that's ok, polling will handle reconnection
+                }
+            }
+        }
+    }
+
+    private fun stopKeepAlive() {
+        keepAliveJob?.cancel()
+        keepAliveJob = null
     }
 
     fun connectToServer() {
@@ -182,7 +206,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isProcessing = true, progress = 0, statusText = "Video wird analysiert...", error = null)
+            _uiState.value = _uiState.value.copy(
+                isProcessing = true, progress = 0,
+                statusText = "Server wird aufgeweckt...", error = null
+            )
+
+            // Step 1: Ping server to wake it up (Railway can sleep after inactivity)
+            var wakeAttempts = 0
+            var serverReady = false
+            while (wakeAttempts < 3 && !serverReady) {
+                try {
+                    ApiClient.getService().ping()
+                    serverReady = true
+                } catch (e: Exception) {
+                    wakeAttempts++
+                    if (wakeAttempts < 3) {
+                        _uiState.value = _uiState.value.copy(
+                            statusText = "Server startet... (${wakeAttempts}/3)"
+                        )
+                        delay(3000L)
+                    }
+                }
+            }
+
+            // Start keep-alive to prevent server from sleeping during long processing
+            startKeepAlive()
+
+            _uiState.value = _uiState.value.copy(statusText = "Video wird analysiert...")
+
             val s = _uiState.value
             val cf = _contentFilter.value
             val sc = _subtitleConfig.value
@@ -212,6 +263,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     pollJob(it.jobId)
                 },
                 onFailure = {
+                    stopKeepAlive()
                     _uiState.value = _uiState.value.copy(isProcessing = false, error = "Fehler: ${it.message}", statusText = "Fehler")
                 }
             )
@@ -253,11 +305,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         )
                         if (st.status == "done") {
+                            stopKeepAlive()
                             _clips.value = st.clips.sortedByDescending { it.viralityScore }
                             _uiState.value = _uiState.value.copy(isProcessing = false)
                             return@launch
                         }
                         if (st.status == "error") {
+                            stopKeepAlive()
                             _uiState.value = _uiState.value.copy(isProcessing = false, error = st.error)
                             return@launch
                         }
@@ -281,6 +335,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // Timeout after 20 minutes
+            stopKeepAlive()
             if (_uiState.value.isProcessing) {
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
