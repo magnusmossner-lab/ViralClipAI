@@ -203,7 +203,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Check connection before starting
         if (!ConnectionManager.isConnected) {
             _uiState.value = _uiState.value.copy(
-                error = ConnectionManager.connectionInfo.value.statusMessage
+                error = ConnectionManager.connectionInfo.value.statusText
             )
             return
         }
@@ -506,7 +506,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isProcessing = true, progress = 0,
-                statusMessage = "Video wird vorbereitet...",
+                statusText = "Video wird vorbereitet...",
                 error = null
             )
             try {
@@ -518,7 +518,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } ?: throw Exception("Konnte Video nicht lesen")
 
                 _uiState.value = _uiState.value.copy(
-                    progress = 5, statusMessage = "Video wird hochgeladen..."
+                    progress = 5, statusText = "Video wird hochgeladen..."
                 )
 
                 // Build request with current settings
@@ -549,14 +549,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = repo.uploadVideo(tempFile, request).getOrThrow()
 
                 _uiState.value = _uiState.value.copy(
-                    progress = 15, statusMessage = "Server verarbeitet Video..."
+                    progress = 15, statusText = "Server verarbeitet Video..."
                 )
 
                 // Start keep-alive heartbeat
                 startKeepAlive()
 
                 // Poll for results (same as URL processing)
-                pollForResults(response.jobId)
+                pollJob(response.jobId)
 
                 // Cleanup temp file
                 tempFile.delete()

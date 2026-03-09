@@ -31,11 +31,11 @@ import com.viralclipai.app.data.models.CaptionConfig
 import com.viralclipai.app.viewmodel.MainViewModel
 
 @Composable
-fun HomeScreen(viewModel: MainViewModel, onGalleryClick: () -> Unit = {}) {
-    val uiState by viewModel.uiState.collectAsState()
-    val contentFilter by viewModel.contentFilter.collectAsState()
-    val subtitleConfig by viewModel.subtitleConfig.collectAsState()
-    val captionConfig by viewModel.captionConfig.collectAsState()
+fun HomeScreen(vm: MainViewModel, onGalleryClick: () -> Unit = {}) {
+    val uiState by vm.uiState.collectAsState()
+    val contentFilter by vm.contentFilter.collectAsState()
+    val subtitleConfig by vm.subtitleConfig.collectAsState()
+    val captionConfig by vm.captionConfig.collectAsState()
     var youtubeUrl by remember { mutableStateOf("") }
     var activeTab by remember { mutableIntStateOf(0) }
 
@@ -84,15 +84,15 @@ fun HomeScreen(viewModel: MainViewModel, onGalleryClick: () -> Unit = {}) {
         Spacer(Modifier.height(12.dp))
 
         when (activeTab) {
-            0 -> ContentFilterTab(viewModel, contentFilter, !uiState.isProcessing)
-            1 -> SubtitleTab(viewModel, subtitleConfig, !uiState.isProcessing)
-            2 -> CaptionTab(viewModel, captionConfig, !uiState.isProcessing)
+            0 -> ContentFilterTab(vm, contentFilter, !uiState.isProcessing)
+            1 -> SubtitleTab(vm, subtitleConfig, !uiState.isProcessing)
+            2 -> CaptionTab(vm, captionConfig, !uiState.isProcessing)
         }
         Spacer(Modifier.height(20.dp))
 
         // Process Button
         Button(
-            onClick = { viewModel.processVideo(youtubeUrl) },
+            onClick = { vm.processVideo(youtubeUrl) },
             enabled = !uiState.isProcessing && youtubeUrl.isNotBlank(),
             modifier = Modifier.fillMaxWidth().height(56.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
