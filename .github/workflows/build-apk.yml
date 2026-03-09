@@ -1,42 +1,40 @@
-name: Build ViralClip AI APK
+name: Build APK
 
 on:
   push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: ViralClipAI-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+    
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    
+    - name: Build Release APK
+      run: ./gradlew assembleRelease --no-daemon
+    
+    - name: Rename APK
+      run: |
+        VERSION=$(grep 'versionName' app/build.gradle.kts | head -1 | grep -o '"[^"]*"' | tr -d '"')
+        cp app/build/outputs/apk/release/app-release-unsigned.apk ViralClipAI-v${VERSION}.apk
+    
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: ViralClipAI-APK
+        path: ViralClipAI-*.apk
+        retention-days: 30

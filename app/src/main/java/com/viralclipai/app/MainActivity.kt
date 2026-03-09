@@ -2,6 +2,7 @@ package com.viralclipai.app
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -19,9 +20,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.viralclipai.app.ui.components.ServerStatusBar
 import com.viralclipai.app.ui.screens.*
 import com.viralclipai.app.ui.theme.ViralClipTheme
+import com.viralclipai.app.update.UpdateManager
 import com.viralclipai.app.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
+
+    private var pendingGalleryCallback: ((Uri?) -> Unit)? = null
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -38,14 +42,48 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // v5.4.0: Gallery video picker
+    private val galleryLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        pendingGalleryCallback?.invoke(uri)
+        pendingGalleryCallback = null
+    }
+
+    fun pickVideoFromGallery(callback: (Uri?) -> Unit) {
+        pendingGalleryCallback = callback
+        galleryLauncher.launch("video/*")
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestStoragePermissions()
+
+        // v5.4.0: Check for updates on start
+        val currentVersionCode = try {
+            packageManager.getPackageInfo(packageName, 0).let {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) it.longVersionCode.toInt()
+                else @Suppress("DEPRECATION") it.versionCode
+            }
+        } catch (_: Exception) { 0 }
+        UpdateManager.checkOnStart(this, currentVersionCode)
+
         setContent {
             ViralClipTheme {
-                MainApp()
+                MainApp(activity = this)
             }
         }
+    }
+
+    // v5.4.0: Force update check (called from Settings)
+    fun forceCheckUpdate() {
+        val currentVersionCode = try {
+            packageManager.getPackageInfo(packageName, 0).let {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) it.longVersionCode.toInt()
+                else @Suppress("DEPRECATION") it.versionCode
+            }
+        } catch (_: Exception) { 0 }
+        UpdateManager.forceCheck(this, currentVersionCode)
     }
 
     private fun requestStoragePermissions() {
@@ -86,7 +124,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainApp() {
+fun MainApp(activity: MainActivity? = null) {
     val vm: MainViewModel = viewModel()
     val connected by vm.serverConnected.collectAsState()
     val clips by vm.clips.collectAsState()
@@ -140,9 +178,19 @@ fun MainApp() {
     ) { p ->
         Box(Modifier.padding(p)) {
             when (tab) {
-                0 -> HomeScreen(vm)
+                0 -> HomeScreen(
+                    vm = vm,
+                    onGalleryClick = {
+                        activity?.pickVideoFromGallery { uri ->
+                            uri?.let { vm.processLocalVideo(activity, it) }
+                        }
+                    }
+                )
                 1 -> ClipsScreen(vm)
-                2 -> SettingsScreen(vm)
+                2 -> SettingsScreen(
+                    vm = vm,
+                    onCheckUpdate = { activity?.forceCheckUpdate() }
+                )
             }
         }
     }

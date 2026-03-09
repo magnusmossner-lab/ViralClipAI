@@ -1,6 +1,9 @@
 package com.viralclipai.app.viewmodel
 
 import android.app.Application
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.content.ContentValues
 import android.content.Intent
 import android.os.Build
@@ -496,5 +499,86 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun rateClip(clipId: String, rating: Int) {
         viewModelScope.launch { repo.sendFeedback(clipId, rating, false) }
+    }
+
+    // ─── v5.4.0: Process video from gallery ───
+    fun processLocalVideo(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isProcessing = true, progress = 0,
+                statusMessage = "Video wird vorbereitet...",
+                error = null
+            )
+            try {
+                // Copy URI content to temp file
+                val fileName = getFileNameFromUri(context, uri) ?: "gallery_video.mp4"
+                val tempFile = File(context.cacheDir, fileName)
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    tempFile.outputStream().use { output -> input.copyTo(output) }
+                } ?: throw Exception("Konnte Video nicht lesen")
+
+                _uiState.value = _uiState.value.copy(
+                    progress = 5, statusMessage = "Video wird hochgeladen..."
+                )
+
+                // Build request with current settings
+                val filter = _contentFilter.value
+                val subtitle = _subtitleConfig.value
+                val caption = _captionConfig.value
+                val request = ProcessRequest(
+                    url = "",
+                    minDuration = _uiState.value.minDuration,
+                    maxDuration = _uiState.value.maxDuration,
+                    format = "9:16",
+                    autoCut = true,
+                    autoCaption = caption.enabled,
+                    autoSubtitle = true,
+                    language = filter.language,
+                    keywords = filter.keywords,
+                    mood = filter.mood,
+                    viralSensitivity = filter.viralSensitivity,
+                    subtitleFont = subtitle.fontFamily,
+                    subtitleSize = subtitle.fontSize,
+                    subtitleColor = subtitle.textColor,
+                    subtitleHighlight = subtitle.highlightColor,
+                    subtitleStyle = subtitle.style,
+                    captionText = caption.text
+                )
+
+                // Upload via multipart
+                val response = repo.uploadVideo(tempFile, request).getOrThrow()
+
+                _uiState.value = _uiState.value.copy(
+                    progress = 15, statusMessage = "Server verarbeitet Video..."
+                )
+
+                // Start keep-alive heartbeat
+                startKeepAlive()
+
+                // Poll for results (same as URL processing)
+                pollForResults(response.jobId)
+
+                // Cleanup temp file
+                tempFile.delete()
+
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isProcessing = false,
+                    error = "Upload fehlgeschlagen: ${e.message}"
+                )
+                stopKeepAlive()
+            }
+        }
+    }
+
+    private fun getFileNameFromUri(context: Context, uri: Uri): String? {
+        var name: String? = null
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (nameIndex >= 0 && cursor.moveToFirst()) {
+                name = cursor.getString(nameIndex)
+            }
+        }
+        return name
     }
 }

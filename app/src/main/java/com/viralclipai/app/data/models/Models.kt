@@ -107,3 +107,13 @@ data class SocialAccount(
     val name: String,
     val connected: Boolean
 )
+
+// ─── v5.4.0: Auto-Update Response ───
+data class UpdateInfo(
+    @SerializedName("latest_version") val latestVersion: String,
+    @SerializedName("latest_version_code") val latestVersionCode: Int,
+    @SerializedName("download_url") val downloadUrl: String,
+    @SerializedName("changelog") val changelog: String = "",
+    @SerializedName("force_update") val forceUpdate: Boolean = false,
+    @SerializedName("min_supported_version") val minSupportedVersion: Int = 1
+)

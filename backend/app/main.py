@@ -1,5 +1,5 @@
 """
-ViralClip AI v4.2 - Backend Server
+ViralClip AI v5.4.0 - Backend Server
 - Content-based clip detection (language, keywords, mood)
 - Karaoke subtitles with customization
 - Hook captions with white box
@@ -8,7 +8,7 @@ ViralClip AI v4.2 - Backend Server
 """
 import uuid, os, time, asyncio, logging
 from datetime import datetime, timedelta
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List
@@ -18,7 +18,7 @@ from app.selfheal.engine import SelfHealingEngine
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("viralclip")
-app = FastAPI(title="ViralClip AI Server", version="4.2.0")
+app = FastAPI(title="ViralClip AI Server", version="5.4.0")
 pipeline = ProcessingPipeline()
 healer = SelfHealingEngine()
 jobs = {}
@@ -74,7 +74,7 @@ async def startup():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "4.2.0", "ai_models_loaded": pipeline.models_ready()}
+    return {"status": "ok", "version": "5.4.0", "ai_models_loaded": pipeline.models_ready()}
 
 
 @app.post("/api/process")
@@ -225,3 +225,81 @@ async def delete_clip(clip_id: str):
     if os.path.exists(p):
         os.remove(p)
     return {"status": "deleted"}
+
+
+# ─── v5.4.0: Keep-alive ping ───
+@app.get("/ping")
+async def ping():
+    return {"pong": True, "ts": __import__("time").time()}
+
+
+# ─── v5.4.0: Gallery Video Upload ───
+@app.post("/api/upload")
+async def upload_video(
+    file: UploadFile = File(...),
+    min_duration: int = Form(30),
+    max_duration: int = Form(180),
+    format: str = Form("9:16"),
+    auto_cut: bool = Form(True),
+    auto_caption: bool = Form(True),
+    auto_subtitle: bool = Form(True),
+    language: str = Form("de"),
+    keywords: str = Form(""),
+    mood: str = Form("all"),
+    viral_sensitivity: str = Form("medium"),
+    subtitle_font: str = Form("Anton"),
+    subtitle_size: str = Form("large"),
+    subtitle_color: str = Form("#FFFFFF"),
+    subtitle_highlight: str = Form("#00FF88"),
+    subtitle_style: str = Form("karaoke"),
+    caption_text: str = Form("")
+):
+    """Process an uploaded video file (from gallery) instead of YouTube URL."""
+    import uuid
+    job_id = str(uuid.uuid4())
+
+    # Save uploaded file
+    upload_path = os.path.join(CLIP_DIR, f"upload_{job_id}.mp4")
+    with open(upload_path, "wb") as f:
+        content = await file.read()
+        f.write(content)
+
+    # Start processing in background
+    settings = {
+        "min_duration": min_duration,
+        "max_duration": max_duration,
+        "format": format,
+        "auto_cut": auto_cut,
+        "auto_caption": auto_caption,
+        "auto_subtitle": auto_subtitle,
+        "language": language,
+        "keywords": [k.strip() for k in keywords.split(",") if k.strip()],
+        "mood": mood,
+        "viral_sensitivity": viral_sensitivity,
+        "subtitle_font": subtitle_font,
+        "subtitle_size": subtitle_size,
+        "subtitle_color": subtitle_color,
+        "subtitle_highlight": subtitle_highlight,
+        "subtitle_style": subtitle_style,
+        "caption_text": caption_text
+    }
+    pipeline.start_local_job(job_id, upload_path, settings)
+    return {"job_id": job_id, "status": "processing", "message": "Video wird verarbeitet..."}
+
+
+# ─── v5.4.0: Auto-Update Endpoint ───
+LATEST_APP_VERSION = os.getenv("LATEST_APP_VERSION", "5.4.0")
+LATEST_APP_VERSION_CODE = int(os.getenv("LATEST_APP_VERSION_CODE", "11"))
+LATEST_APK_URL = os.getenv("LATEST_APK_URL", "")
+LATEST_CHANGELOG = os.getenv("LATEST_CHANGELOG", "Gallery Import & Auto-Update")
+
+@app.get("/api/app/latest")
+async def app_latest():
+    return {
+        "latest_version": LATEST_APP_VERSION,
+        "latest_version_code": LATEST_APP_VERSION_CODE,
+        "download_url": LATEST_APK_URL,
+        "changelog": LATEST_CHANGELOG,
+        "force_update": False,
+        "min_supported_version": 7
+    }

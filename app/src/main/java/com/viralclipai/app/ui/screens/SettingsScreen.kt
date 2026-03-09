@@ -15,9 +15,9 @@ import com.viralclipai.app.data.api.ApiClient
 import com.viralclipai.app.viewmodel.MainViewModel
 
 @Composable
-fun SettingsScreen(viewModel: MainViewModel) {
-    val uiState by viewModel.uiState.collectAsState()
-    val serverConnected by viewModel.serverConnected.collectAsState()
+fun SettingsScreen(vm: MainViewModel, onCheckUpdate: () -> Unit = {}) {
+    val uiState by vm.uiState.collectAsState()
+    val serverConnected by vm.serverConnected.collectAsState()
     // Use the actual configured server URL as default instead of emulator address
     var serverUrl by remember { mutableStateOf(ApiClient.getBaseUrl().trimEnd('/')) }
 
@@ -45,7 +45,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 )
                 Spacer(Modifier.height(8.dp))
                 Button(
-                    onClick = { viewModel.setServerUrl(serverUrl) },
+                    onClick = { vm.setServerUrl(serverUrl) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -63,14 +63,14 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 Text("Min: ${uiState.minDuration}s")
                 Slider(
                     value = uiState.minDuration.toFloat(),
-                    onValueChange = { viewModel.updateSettings(minDuration = it.toInt()) },
+                    onValueChange = { vm.updateSettings(minDuration = it.toInt()) },
                     valueRange = 15f..120f,
                     steps = 20
                 )
                 Text("Max: ${uiState.maxDuration}s")
                 Slider(
                     value = uiState.maxDuration.toFloat(),
-                    onValueChange = { viewModel.updateSettings(maxDuration = it.toInt()) },
+                    onValueChange = { vm.updateSettings(maxDuration = it.toInt()) },
                     valueRange = 30f..180f,
                     steps = 29
                 )
@@ -83,9 +83,9 @@ fun SettingsScreen(viewModel: MainViewModel) {
             Column(Modifier.padding(16.dp)) {
                 Text("\uD83E\uDD16 KI-Features", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
-                Toggle("Auto-Cut", "Gesichtserkennung + Zoom", uiState.autoCut) { viewModel.updateSettings(autoCut = it) }
-                Toggle("Untertitel", "Karaoke-Stil (Wort f\u00FCr Wort)", uiState.autoSubtitles) { viewModel.updateSettings(subtitles = it) }
-                Toggle("Hook-Captions", "Caption in ersten 3s", uiState.autoCaptions) { viewModel.updateSettings(captions = it) }
+                Toggle("Auto-Cut", "Gesichtserkennung + Zoom", uiState.autoCut) { vm.updateSettings(autoCut = it) }
+                Toggle("Untertitel", "Karaoke-Stil (Wort f\u00FCr Wort)", uiState.autoSubtitles) { vm.updateSettings(subtitles = it) }
+                Toggle("Hook-Captions", "Caption in ersten 3s", uiState.autoCaptions) { vm.updateSettings(captions = it) }
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -93,12 +93,21 @@ fun SettingsScreen(viewModel: MainViewModel) {
         // Info
         Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
             Column(Modifier.padding(16.dp)) {
-                Text("ViralClip AI v4.2", fontWeight = FontWeight.Bold)
+                Text("ViralClip AI v5.4.0", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 listOf(
                     "9:16 Hochformat f\u00FCr TikTok/Reels/Shorts",
                     "Karaoke-Untertitel mit Wort-Highlighting",
                     "Content-Filter: Sprache, Keywords, Themen",
+
+        // v5.4.0: Update Check Button
+        Spacer(Modifier.height(16.dp))
+        OutlinedButton(
+            onClick = onCheckUpdate,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("uD83DuDD04 Nach Updates suchen")
+        }
                     "Direkt auf Social Media uploaden",
                     "Clips 1h auf Server gespeichert",
                     "KI lernt aus Downloads & Bewertungen",

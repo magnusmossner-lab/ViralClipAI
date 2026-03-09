@@ -3,6 +3,11 @@ package com.viralclipai.app.data.repository
 import com.viralclipai.app.data.api.ApiClient
 import com.viralclipai.app.data.models.*
 import com.viralclipai.app.network.ConnectionManager
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 
 class ClipRepository {
     private val api get() = ApiClient.getService()
@@ -44,6 +49,40 @@ class ClipRepository {
         }
     }
 
+    // ─── v5.4.0: Upload video from gallery ───
+    suspend fun uploadVideo(videoFile: File, request: ProcessRequest): Result<ProcessResponse> {
+        return ConnectionManager.executeWithRetry(maxAttempts = 2, operation = "Video hochladen") {
+            val filePart = MultipartBody.Part.createFormData(
+                "file",
+                videoFile.name,
+                videoFile.asRequestBody("video/*".toMediaType())
+            )
+            fun str(s: String) = s.toRequestBody("text/plain".toMediaType())
+            fun str(i: Int) = i.toString().toRequestBody("text/plain".toMediaType())
+            fun str(b: Boolean) = b.toString().toRequestBody("text/plain".toMediaType())
+
+            api.uploadVideo(
+                file = filePart,
+                minDuration = str(request.minDuration),
+                maxDuration = str(request.maxDuration),
+                format = str(request.format),
+                autoCut = str(request.autoCut),
+                autoCaption = str(request.autoCaption),
+                autoSubtitle = str(request.autoSubtitle),
+                language = str(request.language),
+                keywords = str(request.keywords.joinToString(",")),
+                mood = str(request.mood),
+                viralSensitivity = str(request.viralSensitivity),
+                subtitleFont = str(request.subtitleFont),
+                subtitleSize = str(request.subtitleSize),
+                subtitleColor = str(request.subtitleColor),
+                subtitleHighlight = str(request.subtitleHighlight),
+                subtitleStyle = str(request.subtitleStyle),
+                captionText = str(request.captionText)
+            )
+        }
+    }
+
     suspend fun getJobStatus(jobId: String): Result<JobStatus> {
         return ConnectionManager.executeWithRetry(maxAttempts = 3, operation = "Job-Status") {
             api.getJobStatus(jobId)
@@ -64,7 +103,7 @@ class ClipRepository {
     }
 
     suspend fun deleteClip(clipId: String): Result<Map<String, String>> {
-        return ConnectionManager.executeWithRetry(maxAttempts = 2, operation = "Clip löschen") {
+        return ConnectionManager.executeWithRetry(maxAttempts = 2, operation = "Clip loeschen") {
             api.deleteClip(clipId)
         }
     }
