@@ -208,8 +208,8 @@ object ConnectionManager {
     // ─── Retry Logic ───
     private fun getBackoffDelay(): Long {
         val failures = consecutiveFailures.get()
-        val delay = baseDelayMs * 2.0.pow(failures.coerceAtMost(8).toDouble()).toLong()
-        return min(delay, maxDelayMs)
+        val delayMs = baseDelayMs * 2.0.pow(failures.coerceAtMost(8).toDouble()).toLong()
+        return min(delayMs, maxDelayMs)
     }
 
     /**
@@ -242,9 +242,9 @@ object ConnectionManager {
                 Log.w(TAG, "$operation fehlgeschlagen (Versuch $attempt/$maxAttempts): ${e.message}")
 
                 if (attempt < maxAttempts) {
-                    val delay = baseDelayMs * 2.0.pow((attempt - 1).toDouble()).toLong()
+                    val retryDelayMs = baseDelayMs * 2.0.pow((attempt - 1).toDouble()).toLong()
                     val jitter = (0..500).random().toLong()
-                    delay(min(delay + jitter, maxDelayMs))
+                    delay(min(retryDelayMs + jitter, maxDelayMs))
                 }
             }
         }
