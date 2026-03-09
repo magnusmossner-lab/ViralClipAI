@@ -31,11 +31,11 @@ import com.viralclipai.app.data.models.CaptionConfig
 import com.viralclipai.app.viewmodel.MainViewModel
 
 @Composable
-fun HomeScreen(vm: MainViewModel, onGalleryClick: () -> Unit = {}) {
-    val uiState by vm.uiState.collectAsState()
-    val contentFilter by vm.contentFilter.collectAsState()
-    val subtitleConfig by vm.subtitleConfig.collectAsState()
-    val captionConfig by vm.captionConfig.collectAsState()
+fun HomeScreen(viewModel: MainViewModel, onGalleryClick: () -> Unit = {}) {
+    val uiState by viewModel.uiState.collectAsState()
+    val contentFilter by viewModel.contentFilter.collectAsState()
+    val subtitleConfig by viewModel.subtitleConfig.collectAsState()
+    val captionConfig by viewModel.captionConfig.collectAsState()
     var youtubeUrl by remember { mutableStateOf("") }
     var activeTab by remember { mutableIntStateOf(0) }
 
@@ -92,7 +92,7 @@ fun HomeScreen(vm: MainViewModel, onGalleryClick: () -> Unit = {}) {
 
         // Process Button
         Button(
-            onClick = { vm.processVideo(youtubeUrl) },
+            onClick = { viewModel.processVideo(youtubeUrl) },
             enabled = !uiState.isProcessing && youtubeUrl.isNotBlank(),
             modifier = Modifier.fillMaxWidth().height(56.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -176,7 +176,7 @@ fun ContentFilterTab(viewModel: MainViewModel, filter: ContentFilter, enabled: B
                     languages.forEach { (code, label) ->
                         FilterChip(
                             selected = filter.language == code,
-                            onClick = { if (enabled) vm.updateContentFilter(language = code) },
+                            onClick = { if (enabled) viewModel.updateContentFilter(language = code) },
                             label = { Text(label, fontSize = 12.sp) },
                             enabled = enabled
                         )
@@ -194,7 +194,7 @@ fun ContentFilterTab(viewModel: MainViewModel, filter: ContentFilter, enabled: B
                     moods.forEach { (key, label) ->
                         FilterChip(
                             selected = filter.mood == key,
-                            onClick = { if (enabled) vm.updateContentFilter(mood = key) },
+                            onClick = { if (enabled) viewModel.updateContentFilter(mood = key) },
                             label = { Text(label, fontSize = 12.sp) },
                             enabled = enabled
                         )
@@ -219,12 +219,12 @@ fun ContentFilterTab(viewModel: MainViewModel, filter: ContentFilter, enabled: B
                     enabled = enabled,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = {
-                        vm.addKeyword(newKeyword)
+                        viewModel.addKeyword(newKeyword)
                         newKeyword = ""
                     }),
                     trailingIcon = {
                         if (newKeyword.isNotEmpty()) {
-                            IconButton(onClick = { vm.addKeyword(newKeyword); newKeyword = "" }) {
+                            IconButton(onClick = { viewModel.addKeyword(newKeyword); newKeyword = "" }) {
                                 Icon(Icons.Default.Add, null)
                             }
                         }
@@ -236,7 +236,7 @@ fun ContentFilterTab(viewModel: MainViewModel, filter: ContentFilter, enabled: B
                         filter.keywords.forEach { kw ->
                             InputChip(
                                 selected = true,
-                                onClick = { if (enabled) vm.removeKeyword(kw) },
+                                onClick = { if (enabled) viewModel.removeKeyword(kw) },
                                 label = { Text(kw, fontSize = 12.sp) },
                                 trailingIcon = { Icon(Icons.Default.Close, null, Modifier.size(14.dp)) }
                             )
@@ -258,7 +258,7 @@ fun ContentFilterTab(viewModel: MainViewModel, filter: ContentFilter, enabled: B
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     suggestions.filter { it !in filter.keywords }.forEach { s ->
                         SuggestionChip(
-                            onClick = { vm.addKeyword(s) },
+                            onClick = { viewModel.addKeyword(s) },
                             label = { Text(s, fontSize = 11.sp) },
                             enabled = enabled
                         )
@@ -276,7 +276,7 @@ fun ContentFilterTab(viewModel: MainViewModel, filter: ContentFilter, enabled: B
                     sensitivities.forEach { (key, label) ->
                         FilterChip(
                             selected = filter.viralSensitivity == key,
-                            onClick = { if (enabled) vm.updateContentFilter(viralSensitivity = key) },
+                            onClick = { if (enabled) viewModel.updateContentFilter(viralSensitivity = key) },
                             label = { Text(label, fontSize = 12.sp) },
                             modifier = Modifier.weight(1f),
                             enabled = enabled
@@ -307,7 +307,7 @@ fun SubtitleTab(viewModel: MainViewModel, config: SubtitleConfig, enabled: Boole
                     styles.forEach { (key, label) ->
                         FilterChip(
                             selected = config.style == key,
-                            onClick = { if (enabled) vm.updateSubtitleConfig(style = key) },
+                            onClick = { if (enabled) viewModel.updateSubtitleConfig(style = key) },
                             label = { Text(label, fontSize = 12.sp) },
                             enabled = enabled
                         )
@@ -325,7 +325,7 @@ fun SubtitleTab(viewModel: MainViewModel, config: SubtitleConfig, enabled: Boole
                     fonts.forEach { font ->
                         FilterChip(
                             selected = config.fontFamily == font,
-                            onClick = { if (enabled) vm.updateSubtitleConfig(fontFamily = font) },
+                            onClick = { if (enabled) viewModel.updateSubtitleConfig(fontFamily = font) },
                             label = { Text(font, fontSize = 12.sp) },
                             enabled = enabled
                         )
@@ -343,7 +343,7 @@ fun SubtitleTab(viewModel: MainViewModel, config: SubtitleConfig, enabled: Boole
                     sizes.forEach { (key, label) ->
                         FilterChip(
                             selected = config.fontSize == key,
-                            onClick = { if (enabled) vm.updateSubtitleConfig(fontSize = key) },
+                            onClick = { if (enabled) viewModel.updateSubtitleConfig(fontSize = key) },
                             label = { Text(label, fontSize = 11.sp) },
                             modifier = Modifier.weight(1f),
                             enabled = enabled
@@ -368,7 +368,7 @@ fun SubtitleTab(viewModel: MainViewModel, config: SubtitleConfig, enabled: Boole
                                     .clip(CircleShape)
                                     .background(color)
                                     .then(if (config.textColor == hex) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier)
-                                    .clickable(enabled = enabled) { vm.updateSubtitleConfig(textColor = hex) }
+                                    .clickable(enabled = enabled) { viewModel.updateSubtitleConfig(textColor = hex) }
                             )
                             Text(name, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -393,7 +393,7 @@ fun SubtitleTab(viewModel: MainViewModel, config: SubtitleConfig, enabled: Boole
                                         .clip(CircleShape)
                                         .background(color)
                                         .then(if (config.highlightColor == hex) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier)
-                                        .clickable(enabled = enabled) { vm.updateSubtitleConfig(highlightColor = hex) }
+                                        .clickable(enabled = enabled) { viewModel.updateSubtitleConfig(highlightColor = hex) }
                                 )
                                 Text(name, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -428,7 +428,7 @@ fun CaptionTab(viewModel: MainViewModel, config: CaptionConfig, enabled: Boolean
             Column(Modifier.padding(12.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("\uD83D\uDCAC Hook-Caption", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Switch(checked = config.enabled, onCheckedChange = { vm.updateCaptionConfig(enabled = it) }, enabled = enabled)
+                    Switch(checked = config.enabled, onCheckedChange = { viewModel.updateCaptionConfig(enabled = it) }, enabled = enabled)
                 }
                 if (config.enabled) {
                     Spacer(Modifier.height(8.dp))
@@ -436,7 +436,7 @@ fun CaptionTab(viewModel: MainViewModel, config: CaptionConfig, enabled: Boolean
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = config.text,
-                        onValueChange = { vm.updateCaptionConfig(text = it) },
+                        onValueChange = { viewModel.updateCaptionConfig(text = it) },
                         label = { Text("Caption-Text (leer = KI generiert)") },
                         placeholder = { Text("z.B. DAS HAT ER WIRKLICH GESAGT \uD83D\uDE31") },
                         modifier = Modifier.fillMaxWidth(),

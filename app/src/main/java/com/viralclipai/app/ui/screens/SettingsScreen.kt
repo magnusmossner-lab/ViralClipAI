@@ -28,6 +28,15 @@ fun SettingsScreen(vm: MainViewModel, onCheckUpdate: () -> Unit = {}) {
             .padding(16.dp)
     ) {
         Text("\u2699\uFE0F Einstellungen", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+            // v5.4.0: Update Check Button
+            Spacer(Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = onCheckUpdate,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("\uD83D\uDD04 Nach Updates suchen")
+            }
+
         Spacer(Modifier.height(24.dp))
 
         // Server
@@ -100,14 +109,6 @@ fun SettingsScreen(vm: MainViewModel, onCheckUpdate: () -> Unit = {}) {
                     "Karaoke-Untertitel mit Wort-Highlighting",
                     "Content-Filter: Sprache, Keywords, Themen",
 
-        // v5.4.0: Update Check Button
-        Spacer(Modifier.height(16.dp))
-        OutlinedButton(
-            onClick = onCheckUpdate,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("uD83DuDD04 Nach Updates suchen")
-        }
                     "Direkt auf Social Media uploaden",
                     "Clips 1h auf Server gespeichert",
                     "KI lernt aus Downloads & Bewertungen",
@@ -117,6 +118,15 @@ fun SettingsScreen(vm: MainViewModel, onCheckUpdate: () -> Unit = {}) {
                 ).forEach { Text("\u2022 $it", fontSize = 13.sp) }
             }
         }
+            // v5.4.0: Update Check Button
+            Spacer(Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = onCheckUpdate,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("\uD83D\uDD04 Nach Updates suchen")
+            }
+
         Spacer(Modifier.height(24.dp))
     }
 }
