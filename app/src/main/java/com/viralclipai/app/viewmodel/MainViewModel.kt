@@ -203,7 +203,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Check connection before starting
         if (!ConnectionManager.isConnected) {
             _uiState.value = _uiState.value.copy(
-                error = ConnectionManager.connectionInfo.value.statusText
+                error = ConnectionManager.connectionInfo.value.statusMessage
             )
             return
         }
