@@ -10,7 +10,7 @@ ViralClip AI v5.3.0 - Backend Server
 """
 import uuid, os, time, asyncio, logging, shutil, subprocess
 from datetime import datetime, timedelta
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from pydantic import BaseModel
 from typing import Optional, List
@@ -303,3 +303,167 @@ async def delete_clip(clip_id: str):
     if os.path.exists(p):
         os.remove(p)
     return {"status": "deleted"}
+
+
+@app.post("/api/upload")
+async def upload_video(
+    bg: BackgroundTasks,
+    file: UploadFile = File(...),
+    min_duration: int = Form(30),
+    max_duration: int = Form(180),
+    format: str = Form("9:16"),
+    auto_cut: str = Form("true"),
+    auto_caption: str = Form("true"),
+    auto_subtitle: str = Form("true"),
+    language: str = Form("de"),
+    keywords: str = Form(""),
+    mood: str = Form("all"),
+    viral_sensitivity: str = Form("medium"),
+    subtitle_font: str = Form("Anton"),
+    subtitle_size: str = Form("large"),
+    subtitle_color: str = Form("#FFFFFF"),
+    subtitle_highlight: str = Form("#00FF88"),
+    subtitle_style: str = Form("karaoke"),
+    caption_text: str = Form("")
+):
+    """Accept uploaded video file from gallery and process it."""
+    job_id = str(uuid.uuid4())[:8]
+    
+    # Save uploaded file to disk
+    upload_path = os.path.join(CLIP_DIR, f"upload_{job_id}.mp4")
+    content = await file.read()
+    with open(upload_path, "wb") as f:
+        f.write(content)
+    
+    # Parse parameters
+    kw_list = [k.strip() for k in keywords.split(",") if k.strip()]
+    
+    jobs[job_id] = {"job_id": job_id, "status": "queued", "progress": 0, "clips": [], "error": None}
+    
+    req = ProcessRequest(
+        url="",
+        min_duration=min_duration,
+        max_duration=max_duration,
+        format=format,
+        auto_cut=auto_cut.lower() == "true",
+        auto_caption=auto_caption.lower() == "true",
+        auto_subtitle=auto_subtitle.lower() == "true",
+        language=language,
+        keywords=kw_list,
+        mood=mood,
+        viral_sensitivity=viral_sensitivity,
+        subtitle_font=subtitle_font,
+        subtitle_size=subtitle_size,
+        subtitle_color=subtitle_color,
+        subtitle_highlight=subtitle_highlight,
+        subtitle_style=subtitle_style,
+        caption_text=caption_text
+    )
+    
+    bg.add_task(run_pipeline_from_file, job_id, upload_path, req)
+    return {"job_id": job_id, "status": "queued", "message": "Upload empfangen, Verarbeitung gestartet"}
+
+
+async def run_pipeline_from_file(job_id, video_path, req):
+    """Same as run_pipeline but skips download step (file already on disk)."""
+    try:
+        # 1. Transcribe + Analyze
+        jobs[job_id].update(status="analyzing", progress=10)
+        transcript = await pipeline.transcribe_video(video_path, req.language)
+
+        # 2. Find viral segments
+        jobs[job_id].update(status="analyzing", progress=25)
+        segments = await pipeline.analyze_and_cut(
+            video_path, req.min_duration, req.max_duration,
+            language=req.language, keywords=req.keywords,
+            mood=req.mood, viral_sensitivity=req.viral_sensitivity
+        )
+
+        subtitle_config = {
+            "font": req.subtitle_font,
+            "size": req.subtitle_size,
+            "color": req.subtitle_color,
+            "highlight": req.subtitle_highlight,
+            "style": req.subtitle_style
+        }
+
+        clips = []
+        for i, seg in enumerate(segments):
+            pct = 30 + int(60 * (i + 1) / max(1, len(segments)))
+            jobs[job_id].update(progress=pct)
+            clip_id = f"{job_id}_{i}"
+            clip_path = os.path.join(CLIP_DIR, f"{clip_id}.mp4")
+
+            jobs[job_id]["status"] = "cutting"
+            await pipeline.create_clip(video_path, seg, clip_path, req.format, req.auto_cut)
+
+            caption = ""
+            if req.auto_subtitle:
+                jobs[job_id]["status"] = "subtitling"
+                seg_transcript = {"segments": []}
+                for ts in transcript.get("segments", []):
+                    if ts["start"] >= seg["start"] and ts["end"] <= seg["end"]:
+                        adjusted = dict(ts)
+                        adjusted["start"] -= seg["start"]
+                        adjusted["end"] -= seg["start"]
+                        if "words" in ts:
+                            adjusted["words"] = []
+                            for w in ts["words"]:
+                                aw = dict(w)
+                                aw["start"] -= seg["start"]
+                                aw["end"] -= seg["start"]
+                                adjusted["words"].append(aw)
+                        seg_transcript["segments"].append(adjusted)
+                await pipeline.add_karaoke_subtitles(clip_path, seg_transcript, subtitle_config)
+
+            if req.auto_caption:
+                jobs[job_id]["status"] = "captioning"
+                caption = req.caption_text if req.caption_text else await pipeline.generate_caption(seg)
+                await pipeline.burn_caption(clip_path, caption)
+
+            if req.auto_cut:
+                jobs[job_id]["status"] = "auto_cut"
+                await pipeline.apply_auto_cut(clip_path, seg)
+
+            score = await pipeline.calculate_virality(seg)
+
+            clips.append({
+                "id": clip_id,
+                "title": seg.get("title", f"Clip {i + 1}"),
+                "start_time": seg["start"],
+                "end_time": seg["end"],
+                "duration": seg["end"] - seg["start"],
+                "virality_score": score,
+                "caption": caption,
+                "preview_url": f"/api/clip/{clip_id}/preview",
+                "download_url": f"/api/clip/{clip_id}/download",
+                "has_subtitles": req.auto_subtitle,
+                "has_caption": req.auto_caption,
+                "transcript": seg.get("text", ""),
+                "expires_at": (datetime.now() + timedelta(hours=1)).isoformat(),
+                "tags": seg.get("tags", []),
+                "matched_keywords": seg.get("matched_keywords", [])
+            })
+
+        clips.sort(key=lambda c: c["virality_score"], reverse=True)
+        jobs[job_id].update(status="done", progress=100, clips=clips)
+
+    except Exception as e:
+        log.error(f"Pipeline error (upload): {e}")
+        jobs[job_id].update(status="error", error=str(e))
+    finally:
+        # Clean up uploaded source file
+        if os.path.exists(video_path):
+            os.remove(video_path)
+
+
+@app.get("/api/app/latest")
+async def app_latest():
+    """Returns the latest APK version info for auto-update."""
+    return {
+        "version": "5.5.0",
+        "version_code": 550,
+        "download_url": "",
+        "release_notes": "YouTube-Downloads repariert, Galerie-Upload funktioniert jetzt",
+        "force_update": False
+    }
