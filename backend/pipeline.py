@@ -38,7 +38,7 @@ class ProcessingPipeline:
         output = os.path.join(output_dir, "source_%(id)s.%(ext)s")
         cmd = [
             "yt-dlp",
-            "--js-runtimes", "nodejs",
+            "--extractor-args", "youtube:player_client=ios,web_creator",
             "-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
             "--merge-output-format", "mp4", "-o", output, "--no-playlist", url
         ]
