@@ -329,11 +329,21 @@ async def upload_video(
     """Accept uploaded video file from gallery and process it."""
     job_id = str(uuid.uuid4())[:8]
     
-    # Save uploaded file to disk
+    # Stream uploaded file to disk in 1MB chunks (avoids OOM for large files)
     upload_path = os.path.join(CLIP_DIR, f"upload_{job_id}.mp4")
-    content = await file.read()
-    with open(upload_path, "wb") as f:
-        f.write(content)
+    MAX_SIZE = 500 * 1024 * 1024  # 500 MB limit
+    file_size = 0
+    with open(upload_path, "wb") as out:
+        while True:
+            chunk = await file.read(1024 * 1024)  # 1MB chunks
+            if not chunk:
+                break
+            file_size += len(chunk)
+            if file_size > MAX_SIZE:
+                out.close()
+                os.remove(upload_path)
+                raise HTTPException(413, "Video zu groß. Maximale Dateigröße: 500MB. Bitte ein kürzeres Video verwenden.")
+            out.write(chunk)
     
     # Parse parameters
     kw_list = [k.strip() for k in keywords.split(",") if k.strip()]
