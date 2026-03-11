@@ -36,7 +36,7 @@ fun ViralityBadge(score: Float) {
 }
 
 @Composable
-fun ServerStatusBar(connected: Boolean, statusText: String) {
+fun ServerStatusBar(connected: Boolean, statusText: String, serverVersion: String = "") {
     Row(
         Modifier
             .fillMaxWidth()
@@ -57,6 +57,6 @@ fun ServerStatusBar(connected: Boolean, statusText: String) {
             color = if (connected) Color(0xFF4CAF50) else Color(0xFFFF5252)
         )
         Spacer(Modifier.weight(1f))
-        Text("v4.2", fontSize = 11.sp, color = Color.Gray)
+        Text(if (serverVersion.isNotEmpty()) "v$serverVersion" else "v5.7.0", fontSize = 11.sp, color = Color.Gray)
     }
 }
