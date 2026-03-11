@@ -1,6 +1,7 @@
 package com.viralclipai.app.data.repository
 
 import com.viralclipai.app.data.api.ApiClient
+import com.viralclipai.app.data.api.CountingRequestBody
 import com.viralclipai.app.data.models.*
 import com.viralclipai.app.network.ConnectionManager
 import okhttp3.MediaType.Companion.toMediaType
@@ -52,13 +53,25 @@ class ClipRepository {
     }
 
     // ─── v5.4.0: Upload video from gallery ───
-    // FIX: Use uploadApi (long write timeout) instead of api (short write timeout)
-    suspend fun uploadVideo(videoFile: File, request: ProcessRequest): Result<ProcessResponse> {
+    // FIX: Use uploadApi (long write timeout) + CountingRequestBody for real upload progress
+    suspend fun uploadVideo(
+        videoFile: File,
+        request: ProcessRequest,
+        onProgress: (Int) -> Unit = {}
+    ): Result<ProcessResponse> {
         return ConnectionManager.executeWithRetry(maxAttempts = 2, operation = "Video hochladen") {
+            val rawBody = videoFile.asRequestBody("video/*".toMediaType())
+            val countingBody = CountingRequestBody(rawBody) { bytesWritten, contentLength ->
+                if (contentLength > 0) {
+                    // Map upload progress to 5% → 14% range
+                    val uploadPct = 5 + (bytesWritten * 9 / contentLength).toInt()
+                    onProgress(uploadPct.coerceIn(5, 14))
+                }
+            }
             val filePart = MultipartBody.Part.createFormData(
                 "file",
                 videoFile.name,
-                videoFile.asRequestBody("video/*".toMediaType())
+                countingBody
             )
             fun str(s: String) = s.toRequestBody("text/plain".toMediaType())
             fun str(i: Int) = i.toString().toRequestBody("text/plain".toMediaType())
