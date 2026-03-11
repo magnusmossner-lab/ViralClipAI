@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
 fun MainApp(activity: MainActivity? = null) {
     val vm: MainViewModel = viewModel()
     val connected by vm.serverConnected.collectAsState()
+    val connectionInfo by vm.connectionInfo.collectAsState()
     val clips by vm.clips.collectAsState()
     var tab by remember { mutableIntStateOf(0) }
 
@@ -141,7 +142,7 @@ fun MainApp(activity: MainActivity? = null) {
 
     Scaffold(
         topBar = {
-            ServerStatusBar(connected, if (connected) "Server verbunden" else "Server offline")
+            ServerStatusBar(connected, if (connected) "Server verbunden" else "Server offline", connectionInfo.serverVersion)
         },
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
