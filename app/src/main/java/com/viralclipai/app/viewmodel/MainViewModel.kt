@@ -2,6 +2,7 @@ package com.viralclipai.app.viewmodel
 
 import android.app.Application
 import android.content.Context
+import com.viralclipai.app.utils.VideoCompressor
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.content.ContentValues
@@ -518,8 +519,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } ?: throw Exception("Konnte Video nicht lesen")
 
                 _uiState.value = _uiState.value.copy(
-                    progress = 5, statusText = "Video wird hochgeladen..."
+                    progress = 5, statusText = "Video wird vorbereitet..."
                 )
+
+                // Compress if > 100MB to keep HD quality (1080p / 8 Mbps)
+                val uploadFile = VideoCompressor.compress(context, tempFile) { pct ->
+                    _uiState.value = _uiState.value.copy(
+                        progress = 5 + (pct * 0.08).toInt(),  // 5% → 13%
+                        statusText = if (pct < 100) "Video wird komprimiert... $pct%" else "Video wird hochgeladen..."
+                    )
+                }
 
                 // Build request with current settings
                 val filter = _contentFilter.value
@@ -545,13 +554,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     captionText = caption.text
                 )
 
-                // Upload via multipart with real progress tracking (5% → 14%)
-                val response = repo.uploadVideo(tempFile, request) { uploadPct ->
-                    _uiState.value = _uiState.value.copy(
-                        progress = uploadPct,
-                        statusText = "Video wird hochgeladen... $uploadPct%"
-                    )
-                }.getOrThrow()
+                // Upload via multipart
+                val response = repo.uploadVideo(uploadFile, request).getOrThrow()
 
                 _uiState.value = _uiState.value.copy(
                     progress = 15, statusText = "Server verarbeitet Video..."
