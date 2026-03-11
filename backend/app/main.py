@@ -1,10 +1,12 @@
 """
-ViralClip AI v5.4.0 - Backend Server
+ViralClip AI v5.5.0 - Backend Server
 - Content-based clip detection (language, keywords, mood)
 - Karaoke subtitles with customization
 - Hook captions with white box
 - Auto-cut with face zoom
 - Social media ready (9:16)
+- Gallery Upload fix (v5.4.0)
+- Resumable download with Range support (v5.4.0)
 """
 import uuid, os, time, asyncio, logging
 from datetime import datetime, timedelta
@@ -18,7 +20,7 @@ from app.selfheal.engine import SelfHealingEngine
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("viralclip")
-app = FastAPI(title="ViralClip AI Server", version="5.4.0")
+app = FastAPI(title="ViralClip AI Server", version="5.5.0")
 pipeline = ProcessingPipeline()
 healer = SelfHealingEngine()
 jobs = {}
@@ -69,7 +71,7 @@ async def startup():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "5.4.0", "ai_models_loaded": pipeline.models_ready()}
+    return {"status": "ok", "version": "5.5.0", "ai_models_loaded": pipeline.models_ready()}
 
 # ─── Keep-alive ping ───
 @app.get("/ping")
@@ -184,9 +186,7 @@ async def run_pipeline(job_id, req):
         else:
             jobs[job_id].update(status="error", error=str(e))
 
-# ─── v5.4.0: Gallery Video Upload ───
-# FIX: Added BackgroundTasks param, initialized jobs[job_id], replaced
-#      non-existent pipeline.start_local_job() with run_pipeline_local()
+# ─── v5.5.0: Gallery Video Upload ───
 @app.post("/api/upload")
 async def upload_video(
     bg: BackgroundTasks,
@@ -217,12 +217,11 @@ async def upload_video(
     with open(upload_path, "wb") as f:
         f.write(content)
 
-    # FIX: Initialize job BEFORE starting background task so polling works immediately
+    # Initialize job BEFORE starting background task so polling works immediately
     jobs[job_id] = {"job_id": job_id, "status": "queued", "progress": 0, "clips": [], "error": None}
 
     kw_list = [k.strip() for k in keywords.split(",") if k.strip()]
 
-    # FIX: Use proper background task instead of non-existent pipeline.start_local_job()
     bg.add_task(run_pipeline_local, job_id, upload_path, {
         "min_duration": min_duration,
         "max_duration": max_duration,
@@ -436,11 +435,11 @@ async def delete_clip(clip_id: str):
         os.remove(p)
     return {"status": "deleted"}
 
-# ─── v5.4.0: Auto-Update Endpoint ───
-LATEST_APP_VERSION = os.getenv("LATEST_APP_VERSION", "5.4.0")
-LATEST_APP_VERSION_CODE = int(os.getenv("LATEST_APP_VERSION_CODE", "11"))
+# ─── v5.5.0: Auto-Update Endpoint ───
+LATEST_APP_VERSION = os.getenv("LATEST_APP_VERSION", "5.5.0")
+LATEST_APP_VERSION_CODE = int(os.getenv("LATEST_APP_VERSION_CODE", "12"))
 LATEST_APK_URL = os.getenv("LATEST_APK_URL", "")
-LATEST_CHANGELOG = os.getenv("LATEST_CHANGELOG", "Gallery Import & Auto-Update")
+LATEST_CHANGELOG = os.getenv("LATEST_CHANGELOG", "Gallery Import, Upload & Download fixes")
 
 @app.get("/api/app/latest")
 async def app_latest():
