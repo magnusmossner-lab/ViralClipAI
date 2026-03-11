@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v4
     - name: Set up JDK 17
@@ -19,15 +21,28 @@ jobs:
       uses: android-actions/setup-android@v3
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+    - name: Extract version
+      id: version
+      run: |
+        VERSION=$(grep 'versionName' app/build.gradle.kts | head -1 | grep -o '"[^"]*"' | tr -d '"')
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
     - name: Build Debug APK
       run: ./gradlew assembleDebug --no-daemon
     - name: Rename APK
-      run: |
-        VERSION=$(grep 'versionName' app/build.gradle.kts | head -1 | grep -o '"[^"]*"' | tr -d '"')
-        cp app/build/outputs/apk/debug/app-debug.apk ViralClipAI-v${VERSION}.apk
-    - name: Upload APK
+      run: cp app/build/outputs/apk/debug/app-debug.apk ViralClipAI-v${VERSION}.apk
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: ViralClipAI-APK
-        path: ViralClipAI-*.apk
+        path: ViralClipAI-v*.apk
         retention-days: 30
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.version.outputs.version }}
+        name: "ViralClip AI v${{ steps.version.outputs.version }}"
+        files: ViralClipAI-v${{ steps.version.outputs.version }}.apk
+        make_latest: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
