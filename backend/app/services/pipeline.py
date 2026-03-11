@@ -38,7 +38,10 @@ class ProcessingPipeline:
         output = os.path.join(output_dir, "source_%(id)s.%(ext)s")
         cmd = [
             "yt-dlp", "-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
-            "--merge-output-format", "mp4", "-o", output, "--no-playlist", url
+            "--merge-output-format", "mp4", "-o", output, "--no-playlist",
+            "--extractor-args", "youtube:player_client=ios,mweb",
+            "--no-warnings",
+            url
         ]
         proc = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
