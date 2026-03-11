@@ -9,8 +9,8 @@ android {
         applicationId = "com.viralclipai.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 12
-        versionName = "5.5.0"
+        versionCode = 13
+        versionName = "5.6.0"
     }
     buildTypes {
         release {
