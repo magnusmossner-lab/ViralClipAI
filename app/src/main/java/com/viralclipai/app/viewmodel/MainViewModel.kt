@@ -545,8 +545,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     captionText = caption.text
                 )
 
-                // Upload via multipart
-                val response = repo.uploadVideo(tempFile, request).getOrThrow()
+                // Upload via multipart with real progress tracking (5% → 14%)
+                val response = repo.uploadVideo(tempFile, request) { uploadPct ->
+                    _uiState.value = _uiState.value.copy(
+                        progress = uploadPct,
+                        statusText = "Video wird hochgeladen... $uploadPct%"
+                    )
+                }.getOrThrow()
 
                 _uiState.value = _uiState.value.copy(
                     progress = 15, statusText = "Server verarbeitet Video..."
