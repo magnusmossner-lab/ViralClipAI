@@ -16,9 +16,7 @@ object ApiClient {
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
-            // Auto-retry if connection was reused but server already closed it (Railway cold-start fix)
             .retryOnConnectionFailure(true)
-            // Keep connections alive for 3 minutes max (within Railway's 5-min sleep window)
             .connectionPool(ConnectionPool(5, 3, TimeUnit.MINUTES))
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BASIC
@@ -40,10 +38,27 @@ object ApiClient {
             .build()
     }
 
+    // FIX: Separate upload client with long WRITE timeout for large video gallery uploads
+    /** Separate upload client with very long write timeout for large video uploads */
+    private val uploadClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .writeTimeout(600, TimeUnit.SECONDS)  // 10 minutes for large video uploads
+            .retryOnConnectionFailure(false)       // Don't retry uploads (could double-send)
+            .connectionPool(ConnectionPool(3, 3, TimeUnit.MINUTES))
+            .addInterceptor(HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BASIC
+            })
+            .build()
+    }
+
     @Volatile private var retrofit: Retrofit? = null
     @Volatile private var apiService: ViralClipApiService? = null
     @Volatile private var downloadRetrofit: Retrofit? = null
     @Volatile private var downloadService: ViralClipApiService? = null
+    @Volatile private var uploadRetrofit: Retrofit? = null  // FIX
+    @Volatile private var uploadService: ViralClipApiService? = null  // FIX
 
     fun setBaseUrl(url: String) {
         val normalizedUrl = if (url.endsWith("/")) url else "$url/"
@@ -54,6 +69,8 @@ object ApiClient {
                 apiService = null
                 downloadRetrofit = null
                 downloadService = null
+                uploadRetrofit = null   // FIX
+                uploadService = null    // FIX
             }
         }
     }
@@ -67,30 +84,38 @@ object ApiClient {
         }
     }
 
-    /** Download service with extended timeout – use for clip downloads only */
+    /** Download service with extended read timeout – use for clip downloads only */
     fun getDownloadService(): ViralClipApiService {
         return downloadService ?: synchronized(this) {
-            downloadService ?: buildDownloadService().also { downloadService = it }
+            downloadService ?: buildService(downloadClient).also {
+                downloadRetrofit = buildRetrofit(downloadClient)
+                downloadService = it
+            }
         }
     }
 
-    private fun buildService(client: OkHttpClient): ViralClipApiService {
-        val r = Retrofit.Builder()
+    // FIX: New upload service with extended write timeout
+    /** Upload service with extended write timeout – use for gallery uploads only */
+    fun getUploadService(): ViralClipApiService {
+        return uploadService ?: synchronized(this) {
+            uploadService ?: buildService(uploadClient).also {
+                uploadRetrofit = buildRetrofit(uploadClient)
+                uploadService = it
+            }
+        }
+    }
+
+    private fun buildRetrofit(client: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-        retrofit = r
-        return r.create(ViralClipApiService::class.java)
     }
 
-    private fun buildDownloadService(): ViralClipApiService {
-        val r = Retrofit.Builder()
-            .baseUrl(baseUrl)
-            .client(downloadClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-        downloadRetrofit = r
+    private fun buildService(client: OkHttpClient): ViralClipApiService {
+        val r = buildRetrofit(client)
+        retrofit = r
         return r.create(ViralClipApiService::class.java)
     }
 }

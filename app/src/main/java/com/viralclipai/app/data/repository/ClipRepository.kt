@@ -13,6 +13,8 @@ class ClipRepository {
     private val api get() = ApiClient.getService()
     // Separate service with 10-minute timeout for large video downloads
     private val downloadApi get() = ApiClient.getDownloadService()
+    // FIX: Separate service with 10-minute WRITE timeout for large gallery uploads
+    private val uploadApi get() = ApiClient.getUploadService()
 
     suspend fun checkServer(): Boolean {
         val result = ConnectionManager.executeWithRetry(maxAttempts = 3, operation = "Health-Check") {
@@ -50,6 +52,7 @@ class ClipRepository {
     }
 
     // ─── v5.4.0: Upload video from gallery ───
+    // FIX: Use uploadApi (long write timeout) instead of api (short write timeout)
     suspend fun uploadVideo(videoFile: File, request: ProcessRequest): Result<ProcessResponse> {
         return ConnectionManager.executeWithRetry(maxAttempts = 2, operation = "Video hochladen") {
             val filePart = MultipartBody.Part.createFormData(
@@ -61,7 +64,8 @@ class ClipRepository {
             fun str(i: Int) = i.toString().toRequestBody("text/plain".toMediaType())
             fun str(b: Boolean) = b.toString().toRequestBody("text/plain".toMediaType())
 
-            api.uploadVideo(
+            // FIX: Use uploadApi instead of api to avoid 60s write timeout for large files
+            uploadApi.uploadVideo(
                 file = filePart,
                 minDuration = str(request.minDuration),
                 maxDuration = str(request.maxDuration),
