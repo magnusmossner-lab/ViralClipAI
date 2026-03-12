@@ -511,23 +511,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 error = null
             )
             try {
-                // Copy URI content to temp file
-                val fileName = getFileNameFromUri(context, uri) ?: "gallery_video.mp4"
+                // FIX v5.9.0: Copy URI to temp file on IO thread (avoids blocking main thread)
+                val fileName = withContext(Dispatchers.IO) {
+                    getFileNameFromUri(context, uri) ?: "gallery_video.mp4"
+                }
                 val tempFile = File(context.cacheDir, fileName)
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    tempFile.outputStream().use { output -> input.copyTo(output) }
-                } ?: throw Exception("Konnte Video nicht lesen")
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        tempFile.outputStream().use { output -> input.copyTo(output) }
+                    } ?: throw Exception("Konnte Video nicht lesen")
+                }
 
                 _uiState.value = _uiState.value.copy(
                     progress = 5, statusText = "Video wird vorbereitet..."
                 )
 
-                // Compress if > 100MB to keep HD quality (1080p / 8 Mbps)
-                val uploadFile = VideoCompressor.compress(context, tempFile) { pct ->
-                    _uiState.value = _uiState.value.copy(
-                        progress = 5 + (pct * 0.08).toInt(),  // 5% → 13%
-                        statusText = if (pct < 100) "Video wird komprimiert... $pct%" else "Video wird hochgeladen..."
-                    )
+                // FIX v5.9.0: Compress on IO thread so UI stays responsive (shows real progress)
+                val uploadFile = withContext(Dispatchers.IO) {
+                    VideoCompressor.compress(context, tempFile) { pct ->
+                        _uiState.value = _uiState.value.copy(
+                            progress = 5 + (pct * 0.08).toInt(),  // 5% → 13%
+                            statusText = if (pct < 100) "Video wird komprimiert... $pct%" else "Video wird hochgeladen..."
+                        )
+                    }
                 }
 
                 // Build request with current settings
@@ -554,11 +560,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     captionText = caption.text
                 )
 
-                // Upload via multipart
-                val response = repo.uploadVideo(uploadFile, request).getOrThrow()
+                // FIX v5.9.0: Pass onProgress so progress bar actually moves (13% → 60%)
+                val response = repo.uploadVideo(uploadFile, request) { pct ->
+                    _uiState.value = _uiState.value.copy(
+                        progress = pct,
+                        statusText = "Video wird hochgeladen... $pct%"
+                    )
+                }.getOrThrow()
 
                 _uiState.value = _uiState.value.copy(
-                    progress = 15, statusText = "Server verarbeitet Video..."
+                    progress = 60, statusText = "Server verarbeitet Video..."
                 )
 
                 // Start keep-alive heartbeat
