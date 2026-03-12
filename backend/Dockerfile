@@ -31,10 +31,7 @@ RUN pip install --no-cache-dir yt-dlp
 
 WORKDIR /app
 
-# Install CPU-only PyTorch FIRST (200MB vs 8GB GPU version)
-RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-# Install remaining requirements
+# Install requirements (no torch needed - faster-whisper uses ctranslate2 which is much lighter)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -43,12 +40,11 @@ COPY main.py .
 COPY pipeline.py .
 COPY app/ app/
 
-RUN mkdir -p /tmp/viralclip_clips
+RUN mkdir -p /tmp/viralclip_clips /tmp/viralclip_jobs
 
 EXPOSE 8000
 
 # Increased timeouts:
-# --timeout-keep-alive 600  = keep connections alive 10 minutes (prevents Railway from killing idle connections)
+# --timeout-keep-alive 600  = keep connections alive 10 minutes
 # --timeout-graceful-shutdown 30 = graceful shutdown
-# --h11-max-incomplete-event-size = handle large request bodies
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-keep-alive 600 --timeout-graceful-shutdown 30"]
