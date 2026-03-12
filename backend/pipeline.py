@@ -1,5 +1,5 @@
 """
-ViralClip AI v4.2 - Processing Pipeline
+ViralClip AI v5.9.0 - Processing Pipeline
 - Karaoke subtitles (word-by-word highlighting)
 - Content-based clip detection (language, keywords, mood)
 - Customizable subtitle fonts, colors, sizes
@@ -38,7 +38,7 @@ class ProcessingPipeline:
         output = os.path.join(output_dir, "source_%(id)s.%(ext)s")
         cmd = [
             "yt-dlp",
-            "--extractor-args", "youtube:player_client=tv_embedded", "--no-check-certificates",
+            "--extractor-args", "youtube:player_client=android,web_creator", "--no-check-certificates",
             "-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
             "--merge-output-format", "mp4", "-o", output, "--no-playlist", url
         ]
@@ -84,18 +84,19 @@ class ProcessingPipeline:
                 return {"segments": [], "language": language}
 
     async def analyze_and_cut(self, video_path, min_dur, max_dur, language="de",
-                               keywords=None, mood="all", viral_sensitivity="medium"):
+                               keywords=None, mood="all", viral_sensitivity="medium", transcript=None):
         """AI scene detection with content-based filtering"""
         keywords = keywords or []
+
+        # Use provided transcript if available (avoids double transcription)
+        if transcript is None:
+            transcript = await self.transcribe_video(video_path, language)
 
         # Get video duration
         cmd = ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "json", video_path]
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE)
         stdout, _ = await proc.communicate()
         total = float(json.loads(stdout.decode())["format"]["duration"])
-
-        # Transcribe for content analysis
-        transcript = await self.transcribe_video(video_path, language)
 
         # Audio peak detection
         cmd2 = ["ffmpeg", "-i", video_path, "-af", "silencedetect=noise=-30dB:d=0.5,volumedetect", "-f", "null", "-"]
@@ -234,7 +235,7 @@ class ProcessingPipeline:
 
         # Build ASS file
         header = f"""[Script Info]
-Title: ViralClip AI v4.2
+Title: ViralClip AI v5.9.0
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
