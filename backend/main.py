@@ -123,7 +123,8 @@ async def run_pipeline(job_id, req):
         segments = await pipeline.analyze_and_cut(
             video_path, req.min_duration, req.max_duration,
             language=req.language, keywords=req.keywords,
-            mood=req.mood, viral_sensitivity=req.viral_sensitivity
+            mood=req.mood, viral_sensitivity=req.viral_sensitivity,
+            transcript=transcript  # FIX: reuse transcript, avoid double transcription
         )
 
         subtitle_config = {
@@ -386,7 +387,8 @@ async def run_pipeline_from_file(job_id, video_path, req):
         segments = await pipeline.analyze_and_cut(
             video_path, req.min_duration, req.max_duration,
             language=req.language, keywords=req.keywords,
-            mood=req.mood, viral_sensitivity=req.viral_sensitivity
+            mood=req.mood, viral_sensitivity=req.viral_sensitivity,
+            transcript=transcript  # FIX: reuse transcript, avoid double transcription
         )
 
         subtitle_config = {
@@ -471,8 +473,8 @@ async def run_pipeline_from_file(job_id, video_path, req):
 async def app_latest():
     """Returns the latest APK version info for auto-update."""
     return {
-        "version": "5.5.0",
-        "version_code": 550,
+        "version": "5.9.0",
+        "version_code": 590,
         "download_url": "",
         "release_notes": "YouTube-Downloads repariert, Galerie-Upload funktioniert jetzt",
         "force_update": False
