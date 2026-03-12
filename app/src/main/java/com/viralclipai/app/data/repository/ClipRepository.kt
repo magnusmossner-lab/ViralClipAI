@@ -63,9 +63,9 @@ class ClipRepository {
             val rawBody = videoFile.asRequestBody("video/*".toMediaType())
             val countingBody = CountingRequestBody(rawBody) { bytesWritten, contentLength ->
                 if (contentLength > 0) {
-                    // Map upload progress to 5% → 14% range
-                    val uploadPct = 5 + (bytesWritten * 9 / contentLength).toInt()
-                    onProgress(uploadPct.coerceIn(5, 14))
+                    // FIX v5.9.0: Expanded range 13% → 60% so user sees real upload progress
+                    val uploadPct = 13 + (bytesWritten * 47 / contentLength).toInt()
+                    onProgress(uploadPct.coerceIn(13, 60))
                 }
             }
             val filePart = MultipartBody.Part.createFormData(
