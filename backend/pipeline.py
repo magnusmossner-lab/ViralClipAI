@@ -54,34 +54,26 @@ class ProcessingPipeline:
         raise Exception("File not found")
 
     async def transcribe_video(self, video_path, language="de"):
-        """Full transcription with word-level timestamps using Whisper"""
+        """Full transcription with word-level timestamps using faster-whisper (int8, low RAM)"""
         try:
-            import whisper_timestamped as whisper
-            model = whisper.load_model("tiny")
+            from faster_whisper import WhisperModel
+            model = WhisperModel("tiny", compute_type="int8", cpu_threads=2)
             lang = None if language == "auto" else language
-            result = whisper.transcribe(model, video_path, language=lang)
+            segments, info = model.transcribe(video_path, language=lang, word_timestamps=True)
+            result = {"segments": [], "language": info.language}
+            for seg in segments:
+                words = []
+                for w in (seg.words or []):
+                    words.append({"text": w.word.strip(), "start": w.start, "end": w.end, "confidence": w.probability})
+                result["segments"].append({
+                    "start": seg.start, "end": seg.end,
+                    "text": seg.text.strip(),
+                    "words": words
+                })
             return result
-        except ImportError:
-            log.warning("whisper_timestamped not available, trying faster-whisper")
-            try:
-                from faster_whisper import WhisperModel
-                model = WhisperModel("tiny", compute_type="int8")
-                lang = None if language == "auto" else language
-                segments, info = model.transcribe(video_path, language=lang, word_timestamps=True)
-                result = {"segments": [], "language": info.language}
-                for seg in segments:
-                    words = []
-                    for w in seg.words:
-                        words.append({"text": w.word.strip(), "start": w.start, "end": w.end, "confidence": w.probability})
-                    result["segments"].append({
-                        "start": seg.start, "end": seg.end,
-                        "text": seg.text.strip(),
-                        "words": words
-                    })
-                return result
-            except ImportError:
-                log.error("No speech recognition available")
-                return {"segments": [], "language": language}
+        except Exception as e:
+            log.error(f"Transcription failed: {e}")
+            return {"segments": [], "language": language}
 
     async def analyze_and_cut(self, video_path, min_dur, max_dur, language="de",
                                keywords=None, mood="all", viral_sensitivity="medium", transcript=None):
