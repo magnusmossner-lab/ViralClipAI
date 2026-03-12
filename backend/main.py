@@ -8,7 +8,7 @@ ViralClip AI v5.3.0 - Backend Server
 - Node.js runtime for yt-dlp YouTube support
 - v5.3.0: Stable connections, ping endpoint, streaming downloads
 """
-import uuid, os, time, asyncio, logging, shutil, subprocess
+import uuid, os, time, asyncio, logging, shutil, subprocess, json
 from datetime import datetime, timedelta
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse, Response
