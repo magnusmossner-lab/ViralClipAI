@@ -19,10 +19,40 @@ from pipeline import ProcessingPipeline
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("viralclip")
-app = FastAPI(title="ViralClip AI Server", version="5.5.0")
+app = FastAPI(title="ViralClip AI Server", version="5.10.0")
 pipeline = ProcessingPipeline()
-jobs = {}
 CLIP_DIR = "/tmp/viralclip_clips"
+JOBS_DIR = "/tmp/viralclip_jobs"
+os.makedirs(JOBS_DIR, exist_ok=True)
+
+def _job_path(job_id: str) -> str:
+    return os.path.join(JOBS_DIR, f"{job_id}.json")
+
+def jobs_get(job_id: str):
+    """Read job from persistent file store."""
+    p = _job_path(job_id)
+    try:
+        with open(p) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+def jobs_set(job_id: str, data: dict):
+    """Write job to persistent file store."""
+    try:
+        with open(_job_path(job_id), "w") as f:
+            json.dump(data, f)
+    except Exception as e:
+        log.error(f"Failed to persist job {job_id}: {e}")
+
+def jobs_update(job_id: str, **kwargs):
+    """Update fields in a persisted job."""
+    data = jobs_get(job_id) or {}
+    data.update(kwargs)
+    jobs_set(job_id, data)
+
+def jobs_contains(job_id: str) -> bool:
+    return os.path.exists(_job_path(job_id))
 CLIP_TTL = 3600
 os.makedirs(CLIP_DIR, exist_ok=True)
 
@@ -88,7 +118,7 @@ async def health():
     node_available = shutil.which("node") is not None
     return {
         "status": "ok",
-        "version": "5.5.0",
+        "version": "5.10.0",
         "ai_models_loaded": pipeline.models_ready(),
         "node_js": node_available
     }
@@ -103,7 +133,7 @@ async def ping():
 @app.post("/api/process")
 async def process_video(req: ProcessRequest, bg: BackgroundTasks):
     job_id = str(uuid.uuid4())[:8]
-    jobs[job_id] = {"job_id": job_id, "status": "queued", "progress": 0, "clips": [], "error": None}
+    jobs_set(job_id, {"job_id": job_id, "status": "queued", "progress": 0, "clips": [], "error": None})
     bg.add_task(run_pipeline, job_id, req)
     return {"job_id": job_id, "status": "queued", "message": "Verarbeitung gestartet"}
 
@@ -111,15 +141,15 @@ async def process_video(req: ProcessRequest, bg: BackgroundTasks):
 async def run_pipeline(job_id, req):
     try:
         # 1. Download
-        jobs[job_id].update(status="downloading", progress=5)
+        jobs_update(job_id, status="downloading", progress=5)
         video_path = await pipeline.download_video(req.url, CLIP_DIR)
 
         # 2. Transcribe + Analyze with content filters
-        jobs[job_id].update(status="analyzing", progress=15)
+        jobs_update(job_id, status="analyzing", progress=15)
         transcript = await pipeline.transcribe_video(video_path, req.language)
 
         # 3. Find viral segments
-        jobs[job_id].update(status="analyzing", progress=25)
+        jobs_update(job_id, status="analyzing", progress=25)
         segments = await pipeline.analyze_and_cut(
             video_path, req.min_duration, req.max_duration,
             language=req.language, keywords=req.keywords,
@@ -138,18 +168,18 @@ async def run_pipeline(job_id, req):
         clips = []
         for i, seg in enumerate(segments):
             pct = 30 + int(60 * (i + 1) / max(1, len(segments)))
-            jobs[job_id].update(progress=pct)
+            jobs_update(job_id, progress=pct)
             clip_id = f"{job_id}_{i}"
             clip_path = os.path.join(CLIP_DIR, f"{clip_id}.mp4")
 
             # 4. Create clip (9:16 crop + audio)
-            jobs[job_id]["status"] = "cutting"
+            jobs_update(job_id, status="cutting")
             await pipeline.create_clip(video_path, seg, clip_path, req.format, req.auto_cut)
 
             # 5. Add karaoke subtitles
             caption = ""
             if req.auto_subtitle:
-                jobs[job_id]["status"] = "subtitling"
+                jobs_update(job_id, status="subtitling")
                 # Get transcript for this specific segment
                 seg_transcript = {"segments": []}
                 for ts in transcript.get("segments", []):
@@ -170,13 +200,13 @@ async def run_pipeline(job_id, req):
 
             # 6. Add hook caption
             if req.auto_caption:
-                jobs[job_id]["status"] = "captioning"
+                jobs_update(job_id, status="captioning")
                 caption = req.caption_text if req.caption_text else await pipeline.generate_caption(seg)
                 await pipeline.burn_caption(clip_path, caption)
 
             # 7. Auto-cut face zoom
             if req.auto_cut:
-                jobs[job_id]["status"] = "auto_cut"
+                jobs_update(job_id, status="auto_cut")
                 await pipeline.apply_auto_cut(clip_path, seg)
 
             # 8. Calculate virality score
@@ -201,18 +231,18 @@ async def run_pipeline(job_id, req):
             })
 
         clips.sort(key=lambda c: c["virality_score"], reverse=True)
-        jobs[job_id].update(status="done", progress=100, clips=clips)
+        jobs_update(job_id, status="done", progress=100, clips=clips)
 
     except Exception as e:
         log.error(f"Pipeline error: {e}")
-        jobs[job_id].update(status="error", error=str(e))
+        jobs_update(job_id, status="error", error=str(e))
 
 
 @app.get("/api/job/{job_id}")
 async def job_status(job_id: str):
-    if job_id not in jobs:
-        raise HTTPException(404)
-    return jobs[job_id]
+    if not jobs_contains(job_id):
+        raise HTTPException(404, "Job nicht gefunden")
+    return jobs_get(job_id)
 
 
 @app.get("/api/clip/{clip_id}/preview")
@@ -349,7 +379,7 @@ async def upload_video(
     # Parse parameters
     kw_list = [k.strip() for k in keywords.split(",") if k.strip()]
     
-    jobs[job_id] = {"job_id": job_id, "status": "queued", "progress": 0, "clips": [], "error": None}
+    jobs_set(job_id, {"job_id": job_id, "status": "queued", "progress": 0, "clips": [], "error": None})
     
     req = ProcessRequest(
         url="",
@@ -379,11 +409,11 @@ async def run_pipeline_from_file(job_id, video_path, req):
     """Same as run_pipeline but skips download step (file already on disk)."""
     try:
         # 1. Transcribe + Analyze
-        jobs[job_id].update(status="analyzing", progress=10)
+        jobs_update(job_id, status="analyzing", progress=10)
         transcript = await pipeline.transcribe_video(video_path, req.language)
 
         # 2. Find viral segments
-        jobs[job_id].update(status="analyzing", progress=25)
+        jobs_update(job_id, status="analyzing", progress=25)
         segments = await pipeline.analyze_and_cut(
             video_path, req.min_duration, req.max_duration,
             language=req.language, keywords=req.keywords,
@@ -402,16 +432,16 @@ async def run_pipeline_from_file(job_id, video_path, req):
         clips = []
         for i, seg in enumerate(segments):
             pct = 30 + int(60 * (i + 1) / max(1, len(segments)))
-            jobs[job_id].update(progress=pct)
+            jobs_update(job_id, progress=pct)
             clip_id = f"{job_id}_{i}"
             clip_path = os.path.join(CLIP_DIR, f"{clip_id}.mp4")
 
-            jobs[job_id]["status"] = "cutting"
+            jobs_update(job_id, status="cutting")
             await pipeline.create_clip(video_path, seg, clip_path, req.format, req.auto_cut)
 
             caption = ""
             if req.auto_subtitle:
-                jobs[job_id]["status"] = "subtitling"
+                jobs_update(job_id, status="subtitling")
                 seg_transcript = {"segments": []}
                 for ts in transcript.get("segments", []):
                     if ts["start"] >= seg["start"] and ts["end"] <= seg["end"]:
@@ -429,12 +459,12 @@ async def run_pipeline_from_file(job_id, video_path, req):
                 await pipeline.add_karaoke_subtitles(clip_path, seg_transcript, subtitle_config)
 
             if req.auto_caption:
-                jobs[job_id]["status"] = "captioning"
+                jobs_update(job_id, status="captioning")
                 caption = req.caption_text if req.caption_text else await pipeline.generate_caption(seg)
                 await pipeline.burn_caption(clip_path, caption)
 
             if req.auto_cut:
-                jobs[job_id]["status"] = "auto_cut"
+                jobs_update(job_id, status="auto_cut")
                 await pipeline.apply_auto_cut(clip_path, seg)
 
             score = await pipeline.calculate_virality(seg)
@@ -458,11 +488,11 @@ async def run_pipeline_from_file(job_id, video_path, req):
             })
 
         clips.sort(key=lambda c: c["virality_score"], reverse=True)
-        jobs[job_id].update(status="done", progress=100, clips=clips)
+        jobs_update(job_id, status="done", progress=100, clips=clips)
 
     except Exception as e:
         log.error(f"Pipeline error (upload): {e}")
-        jobs[job_id].update(status="error", error=str(e))
+        jobs_update(job_id, status="error", error=str(e))
     finally:
         # Clean up uploaded source file
         if os.path.exists(video_path):
