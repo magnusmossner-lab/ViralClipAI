@@ -57,7 +57,7 @@ class ProcessingPipeline:
         """Full transcription with word-level timestamps using Whisper"""
         try:
             import whisper_timestamped as whisper
-            model = whisper.load_model("base")
+            model = whisper.load_model("tiny")
             lang = None if language == "auto" else language
             result = whisper.transcribe(model, video_path, language=lang)
             return result
@@ -65,7 +65,7 @@ class ProcessingPipeline:
             log.warning("whisper_timestamped not available, trying faster-whisper")
             try:
                 from faster_whisper import WhisperModel
-                model = WhisperModel("base", compute_type="int8")
+                model = WhisperModel("tiny", compute_type="int8")
                 lang = None if language == "auto" else language
                 segments, info = model.transcribe(video_path, language=lang, word_timestamps=True)
                 result = {"segments": [], "language": info.language}
