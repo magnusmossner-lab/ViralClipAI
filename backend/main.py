@@ -19,7 +19,7 @@ from pipeline import ProcessingPipeline
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("viralclip")
-app = FastAPI(title="ViralClip AI Server", version="5.10.0")
+app = FastAPI(title="ViralClip AI Server", version="5.11.0")
 pipeline = ProcessingPipeline()
 CLIP_DIR = "/tmp/viralclip_clips"
 JOBS_DIR = "/tmp/viralclip_jobs"
@@ -231,7 +231,18 @@ async def run_pipeline(job_id, req):
             })
 
         clips.sort(key=lambda c: c["virality_score"], reverse=True)
-        jobs_update(job_id, status="done", progress=100, clips=clips)
+        # FIX v5.11.0: Only return clips that are valid video files
+        valid_clips = []
+        for c in clips:
+            clip_file = os.path.join(CLIP_DIR, f"{c['id']}.mp4")
+            if os.path.exists(clip_file) and os.path.getsize(clip_file) > 10000:
+                valid_clips.append(c)
+            else:
+                log.warning(f"Skipping invalid clip {c['id']} (file missing or too small)")
+        if valid_clips:
+            jobs_update(job_id, status="done", progress=100, clips=valid_clips)
+        else:
+            jobs_update(job_id, status="error", error="Clips konnten nicht erstellt werden. Bitte versuche ein kürzeres Video.")
 
     except Exception as e:
         log.error(f"Pipeline error: {e}")
@@ -488,7 +499,18 @@ async def run_pipeline_from_file(job_id, video_path, req):
             })
 
         clips.sort(key=lambda c: c["virality_score"], reverse=True)
-        jobs_update(job_id, status="done", progress=100, clips=clips)
+        # FIX v5.11.0: Only return clips that are valid video files (not empty 48-byte shells)
+        valid_clips = []
+        for c in clips:
+            clip_file = os.path.join(CLIP_DIR, f"{c['id']}.mp4")
+            if os.path.exists(clip_file) and os.path.getsize(clip_file) > 10000:
+                valid_clips.append(c)
+            else:
+                log.warning(f"Skipping invalid clip {c['id']} (file missing or too small)")
+        if valid_clips:
+            jobs_update(job_id, status="done", progress=100, clips=valid_clips)
+        else:
+            jobs_update(job_id, status="error", error="Clips konnten nicht erstellt werden. Bitte versuche ein kürzeres Video.")
 
     except Exception as e:
         log.error(f"Pipeline error (upload): {e}")
@@ -503,8 +525,8 @@ async def run_pipeline_from_file(job_id, video_path, req):
 async def app_latest():
     """Returns the latest APK version info for auto-update."""
     return {
-        "version": "5.9.0",
-        "version_code": 590,
+        "version": "5.11.0",
+        "version_code": 5110,
         "download_url": "",
         "release_notes": "YouTube-Downloads repariert, Galerie-Upload funktioniert jetzt",
         "force_update": False
