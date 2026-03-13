@@ -6,3 +6,5 @@ dockerfilePath = "backend/Dockerfile"
 startCommand = "cd /app && python main.py"
 healthcheckPath = "/health"
 restartPolicyType = "on_failure"
+
+# deploy-trigger-v5.11.0
