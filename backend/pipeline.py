@@ -1,12 +1,17 @@
 """
-ViralClip AI v5.9.0 - Processing Pipeline
+ViralClip AI v5.11.0 - Processing Pipeline
 - Karaoke subtitles (word-by-word highlighting)
 - Content-based clip detection (language, keywords, mood)
 - Customizable subtitle fonts, colors, sizes
 - Hook caption with white box
 - Auto-cut with face zoom
+- v5.11.0: Fixed empty clip files (48 bytes) caused by OOM on Railway
+  - Whisper model freed from RAM after transcription
+  - FFmpeg uses ultrafast preset + lower memory settings
+  - All FFmpeg calls check return codes and log errors
+  - Clip validation before returning to user
 """
-import os, json, asyncio, logging, random, re
+import os, json, asyncio, logging, random, re, gc
 from datetime import datetime
 
 log = logging.getLogger("viralclip.pipeline")
@@ -54,7 +59,9 @@ class ProcessingPipeline:
         raise Exception("File not found")
 
     async def transcribe_video(self, video_path, language="de"):
-        """Full transcription with word-level timestamps using faster-whisper (int8, low RAM)"""
+        """Full transcription with word-level timestamps using faster-whisper (int8, low RAM).
+        FIX v5.11.0: Model is freed from RAM after transcription to prevent OOM during ffmpeg."""
+        model = None
         try:
             from faster_whisper import WhisperModel
             model = WhisperModel("tiny", compute_type="int8", cpu_threads=2)
@@ -74,6 +81,12 @@ class ProcessingPipeline:
         except Exception as e:
             log.error(f"Transcription failed: {e}")
             return {"segments": [], "language": language}
+        finally:
+            # FIX v5.11.0: Free Whisper model from RAM so ffmpeg has enough memory
+            if model is not None:
+                del model
+            gc.collect()
+            log.info("Whisper model freed from RAM")
 
     async def analyze_and_cut(self, video_path, min_dur, max_dur, language="de",
                                keywords=None, mood="all", viral_sensitivity="medium", transcript=None):
@@ -192,26 +205,53 @@ class ProcessingPipeline:
             t += random.uniform(5, 30)
         return peaks
 
+    async def _run_ffmpeg(self, cmd, step_name="ffmpeg"):
+        """Run ffmpeg with error checking. Returns True on success, False on failure.
+        FIX v5.11.0: All ffmpeg calls now go through this method for proper error handling."""
+        log.info(f"[{step_name}] Running: {' '.join(cmd[:6])}...")
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            log.error(f"[{step_name}] FAILED (rc={proc.returncode}): {stderr.decode()[-500:]}")
+            return False
+        log.info(f"[{step_name}] OK")
+        return True
+
+    def _validate_clip(self, path, min_size=10000):
+        """Check if a clip file is a valid video (not an empty MP4 shell).
+        FIX v5.11.0: Prevents returning 48-byte empty clips to the user."""
+        if not os.path.exists(path):
+            log.error(f"Clip file does not exist: {path}")
+            return False
+        size = os.path.getsize(path)
+        if size < min_size:
+            log.error(f"Clip file too small ({size} bytes), likely corrupted: {path}")
+            return False
+        return True
+
     async def create_clip(self, source, seg, output, fmt="9:16", auto_cut=True):
-        """Create clip with 9:16 crop. If auto_cut enabled, apply face-zoom."""
+        """Create clip with 9:16 crop.
+        FIX v5.11.0: ultrafast preset, error checking, validation."""
         vf = "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920"
         cmd = [
             "ffmpeg", "-y", "-ss", str(seg["start"]), "-i", source,
             "-t", str(seg["end"] - seg["start"]),
             "-vf", vf,
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-c:a", "aac", "-b:a", "192k",  # Higher audio quality
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+            "-c:a", "aac", "-b:a", "128k",
+            "-threads", "1",
             "-movflags", "+faststart", output
         ]
-        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        await proc.communicate()
+        success = await self._run_ffmpeg(cmd, "create_clip")
+        if not success or not self._validate_clip(output):
+            raise Exception(f"FFmpeg create_clip failed for segment {seg['start']:.1f}-{seg['end']:.1f}")
 
     async def add_karaoke_subtitles(self, clip_path, transcript_data, config):
         """Add karaoke-style subtitles with word-by-word highlighting"""
         font = config.get("font", "Anton")
         size = FONT_SIZES.get(config.get("size", "large"), 64)
-        text_color = config.get("color", "#FFFFFF").replace("#", "&H00") if config.get("color") else "&H00FFFFFF"
-        highlight_color = config.get("highlight", "#00FF88").replace("#", "&H00") if config.get("highlight") else "&H0088FF00"
         style_type = config.get("style", "karaoke")
 
         # Convert hex color to ASS BGR format
@@ -227,7 +267,7 @@ class ProcessingPipeline:
 
         # Build ASS file
         header = f"""[Script Info]
-Title: ViralClip AI v5.9.0
+Title: ViralClip AI v5.11.0
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
@@ -244,7 +284,6 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         for seg in transcript_data.get("segments", []):
             words = seg.get("words", [])
             if not words:
-                # Fallback: show entire segment text
                 s = seg["start"]
                 e = seg["end"]
                 text = seg["text"].strip().upper()
@@ -252,11 +291,9 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
                 continue
 
             if style_type == "karaoke":
-                # Karaoke: highlight current word
                 for i, word in enumerate(words):
                     ws = word["start"]
                     we = word["end"]
-                    # Build line with current word highlighted
                     parts = []
                     for j, w in enumerate(words):
                         wt = w["text"].upper()
@@ -267,7 +304,6 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
                     full_text = " ".join(parts)
                     lines.append(self._format_ass_dialogue(ws, we, full_text))
             else:
-                # Classic / other styles: show full segment
                 s = seg["start"]
                 e = seg["end"]
                 text = seg["text"].strip().upper()
@@ -281,13 +317,16 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         cmd = [
             "ffmpeg", "-y", "-i", clip_path,
             "-vf", f"ass={ass_path}",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-c:a", "copy", tmp
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+            "-c:a", "copy", "-threads", "1", tmp
         ]
-        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        await proc.communicate()
-        if proc.returncode == 0:
+        success = await self._run_ffmpeg(cmd, "add_subtitles")
+        if success and self._validate_clip(tmp):
             os.replace(tmp, clip_path)
+        else:
+            log.warning("Subtitle burning failed - clip will be without subtitles")
+            if os.path.exists(tmp):
+                os.remove(tmp)
         if os.path.exists(ass_path):
             os.remove(ass_path)
 
@@ -308,7 +347,6 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         safe = caption.replace("'", "\\'").replace(":", "\\:")
         tmp = clip_path + ".cap.mp4"
 
-        # White rounded box at top with black bold text
         vf = (
             f"drawbox=x=(w-w*0.9)/2:y=h*0.08:w=w*0.9:h=80:color=white@0.95:t=fill,"
             f"drawtext=text='{safe}':"
@@ -319,19 +357,21 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         cmd = [
             "ffmpeg", "-y", "-i", clip_path,
             "-vf", vf,
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-c:a", "copy", tmp
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+            "-c:a", "copy", "-threads", "1", tmp
         ]
-        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        await proc.communicate()
-        if proc.returncode == 0:
+        success = await self._run_ffmpeg(cmd, "burn_caption")
+        if success and self._validate_clip(tmp):
             os.replace(tmp, clip_path)
+        else:
+            log.warning("Caption burning failed - clip will be without caption")
+            if os.path.exists(tmp):
+                os.remove(tmp)
 
     async def generate_caption(self, seg):
         """Generate hook caption based on content and energy"""
         energy = seg.get("energy", 0.5)
         tags = seg.get("tags", [])
-        text = seg.get("text", "")
 
         high = [
             "ER RASTET KOMPLETT AUS \U0001f480\U0001f525",
@@ -359,26 +399,29 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         return random.choice(low)
 
     async def apply_auto_cut(self, clip_path, seg):
-        """Apply face-zoom effect for reaction/talking segments"""
+        """Apply gentle zoom effect for reaction/talking segments.
+        FIX v5.11.0: Simplified zoom (no zoompan) to reduce RAM usage on Railway."""
         energy = seg.get("energy", 0.5)
-        if energy > 0.7:
-            # Zoom into center (face area) during high-energy moments
-            vf = "zoompan=z='min(1.3,1+0.005*on)':d=1:x='iw/2-(iw/zoom/2)':y='ih/3-(ih/zoom/3)':s=1080x1920"
-        else:
-            # Gentle zoom for normal segments
-            vf = "zoompan=z='min(1.1,1+0.001*on)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920"
+        if energy < 0.7:
+            # Skip zoom for low-energy segments (saves RAM + time)
+            return
 
+        # Simple crop-zoom instead of resource-heavy zoompan filter
+        # Crop 10% from edges and scale back = 1.1x zoom effect
         tmp = clip_path + ".zoom.mp4"
         cmd = [
             "ffmpeg", "-y", "-i", clip_path,
-            "-vf", vf,
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-c:a", "copy", "-shortest", tmp
+            "-vf", "crop=iw*0.9:ih*0.9:iw*0.05:ih*0.05,scale=1080:1920",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+            "-c:a", "copy", "-threads", "1", tmp
         ]
-        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        await proc.communicate()
-        if proc.returncode == 0:
+        success = await self._run_ffmpeg(cmd, "auto_cut_zoom")
+        if success and self._validate_clip(tmp):
             os.replace(tmp, clip_path)
+        else:
+            log.warning("Auto-cut zoom failed - clip will be without zoom")
+            if os.path.exists(tmp):
+                os.remove(tmp)
 
     async def calculate_virality(self, seg):
         """Score based on audio energy, content match, and tags"""
@@ -399,16 +442,14 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
             score += 0.07
         return min(1.0, max(0.0, self._apply_feedback(score)))
 
-    def _apply_feedback(self, base):
+    def _apply_feedback(self, score):
+        """Adjust score based on historical feedback"""
         if not self.feedback_db:
-            return base
-        avg_r = sum(f.get("rating", 3) for f in self.feedback_db) / len(self.feedback_db)
-        return base + (avg_r - 3) * 0.05
+            return score
+        avg_rating = sum(f.get("rating", 3) for f in self.feedback_db) / len(self.feedback_db)
+        return score * (0.8 + 0.04 * avg_rating)
 
     def record_feedback(self, clip_id, rating, downloaded):
-        self.feedback_db.append({
-            "clip_id": clip_id,
-            "rating": rating,
-            "downloaded": downloaded,
-            "ts": datetime.now().isoformat()
-        })
+        self.feedback_db.append({"clip_id": clip_id, "rating": rating, "downloaded": downloaded})
+        if len(self.feedback_db) > 100:
+            self.feedback_db = self.feedback_db[-100:]
