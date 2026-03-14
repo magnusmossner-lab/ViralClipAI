@@ -118,7 +118,7 @@ async def health():
     node_available = shutil.which("node") is not None
     return {
         "status": "ok",
-        "version": "5.10.0",
+        "version": "5.11.0",
         "ai_models_loaded": pipeline.models_ready(),
         "node_js": node_available
     }
