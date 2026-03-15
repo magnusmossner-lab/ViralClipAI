@@ -25,20 +25,40 @@ CLIP_DIR = "/tmp/viralclip_clips"
 JOBS_DIR = "/tmp/viralclip_jobs"
 os.makedirs(JOBS_DIR, exist_ok=True)
 
+# HYBRID: In-memory dict (fast) + disk persistence (survives restart)
+memory_jobs: dict = {}
+
 def _job_path(job_id: str) -> str:
     return os.path.join(JOBS_DIR, f"{job_id}.json")
 
+def _load_jobs_from_disk():
+    import glob
+    for jf in glob.glob(os.path.join(JOBS_DIR, "*.json")):
+        try:
+            with open(jf) as f:
+                data = json.load(f)
+                jid = os.path.basename(jf).replace(".json", "")
+                memory_jobs[jid] = data
+                log.info(f"Restored job {jid} from disk")
+        except Exception:
+            pass
+
+_load_jobs_from_disk()
+
 def jobs_get(job_id: str):
-    """Read job from persistent file store."""
+    if job_id in memory_jobs:
+        return memory_jobs[job_id]
     p = _job_path(job_id)
     try:
         with open(p) as f:
-            return json.load(f)
+            data = json.load(f)
+            memory_jobs[job_id] = data
+            return data
     except Exception:
         return None
 
 def jobs_set(job_id: str, data: dict):
-    """Write job to persistent file store."""
+    memory_jobs[job_id] = data
     try:
         with open(_job_path(job_id), "w") as f:
             json.dump(data, f)
@@ -46,13 +66,12 @@ def jobs_set(job_id: str, data: dict):
         log.error(f"Failed to persist job {job_id}: {e}")
 
 def jobs_update(job_id: str, **kwargs):
-    """Update fields in a persisted job."""
     data = jobs_get(job_id) or {}
     data.update(kwargs)
     jobs_set(job_id, data)
 
 def jobs_contains(job_id: str) -> bool:
-    return os.path.exists(_job_path(job_id))
+    return job_id in memory_jobs or os.path.exists(_job_path(job_id))
 CLIP_TTL = 3600
 os.makedirs(CLIP_DIR, exist_ok=True)
 
@@ -118,7 +137,7 @@ async def health():
     node_available = shutil.which("node") is not None
     return {
         "status": "ok",
-        "version": "5.11.0",
+        "version": "5.11.1",
         "ai_models_loaded": pipeline.models_ready(),
         "node_js": node_available
     }
@@ -525,7 +544,7 @@ async def run_pipeline_from_file(job_id, video_path, req):
 async def app_latest():
     """Returns the latest APK version info for auto-update."""
     return {
-        "version": "5.11.0",
+        "version": "5.11.1",
         "version_code": 5110,
         "download_url": "",
         "release_notes": "YouTube-Downloads repariert, Galerie-Upload funktioniert jetzt",
