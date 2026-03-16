@@ -57,6 +57,6 @@ fun ServerStatusBar(connected: Boolean, statusText: String, serverVersion: Strin
             color = if (connected) Color(0xFF4CAF50) else Color(0xFFFF5252)
         )
         Spacer(Modifier.weight(1f))
-        Text(if (serverVersion.isNotEmpty()) "v$serverVersion" else "v5.7.0", fontSize = 11.sp, color = Color.Gray)
+        Text(if (serverVersion.isNotEmpty()) "v$serverVersion" else "v5.11.1", fontSize = 11.sp, color = Color.Gray)
     }
 }

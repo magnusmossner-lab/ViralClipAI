@@ -50,7 +50,7 @@ fun HomeScreen(vm: MainViewModel, onGalleryClick: () -> Unit = {}) {
         // Header
         Spacer(Modifier.height(12.dp))
         Text("\uD83D\uDD25 ViralClip AI", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-        Text("v5.4.0 \u2022 YouTube + Galerie \u2192 Virale Clips", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("v5.11.1 \u2022 YouTube + Galerie \u2192 Virale Clips", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(20.dp))
 
         // URL Input

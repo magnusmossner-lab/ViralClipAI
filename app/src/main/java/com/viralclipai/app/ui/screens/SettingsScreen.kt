@@ -93,7 +93,7 @@ fun SettingsScreen(vm: MainViewModel, onCheckUpdate: () -> Unit = {}) {
         // Info
         Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
             Column(Modifier.padding(16.dp)) {
-                Text("ViralClip AI v5.4.0", fontWeight = FontWeight.Bold)
+                Text("ViralClip AI v5.11.1", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 listOf(
                     "9:16 Hochformat f\u00FCr TikTok/Reels/Shorts",
