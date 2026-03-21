@@ -1,0 +1,8 @@
+5.1.1
+All fixes applied:
+- ConnectionManager auto-reconnect
+- Compose Compiler 1.5.4
+- FileProvider URIs
+- Dynamic server URLs
+- Railway production default
+- Subtitle/caption fixes
